@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write   # 시험용 APK 를 '릴리스'로 올려 폰에서 바로 내려받게 하려고 필요해요
 
 jobs:
   build:
@@ -88,6 +88,22 @@ jobs:
           name: whyttuji-debug-apk
           path: app/android/app/build/outputs/apk/debug/*.apk
           retention-days: 14
+
+      # 폰에서 링크 하나로 내려받아 설치해 볼 수 있게 해요. (로그인 없이 받을 수 있어요)
+      # 주소: https://github.com/<저장소>/releases/download/test-latest/whyttuji-test.apk
+      - name: 시험용 APK 를 내려받기 쉽게 올리기
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK="$(ls app/android/app/build/outputs/apk/debug/*.apk | head -n 1)"
+          cp "$APK" whyttuji-test.apk
+          gh release delete test-latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create test-latest whyttuji-test.apk \
+            --title "왜뜨지 시험용 앱 (최신)" \
+            --notes "폰에 바로 설치해 써볼 수 있는 시험용 앱이에요. 광고는 구글 테스트 광고만 나와요. 정식 출시용이 아니에요. (빌드 ${{ github.run_number }}, 커밋 ${GITHUB_SHA::7})" \
+            --prerelease --target "$GITHUB_SHA"
 
       - name: 서명 정보가 등록돼 있는지 확인
         id: ks

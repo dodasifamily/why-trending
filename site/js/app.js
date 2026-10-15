@@ -352,6 +352,16 @@
 
   function sendReport(c, redraw) {
     const rep = CFG.report || {};
+    if (!rep.endpoint && rep.email) {
+      // 접수 폼이 없으면 메일 앱을 열어 신고 내용을 미리 적어 줘요.
+      // 실제로 보냈는지는 알 수 없어서 '완료'로 표시하지는 않아요.
+      const subject = `[왜뜨지 신고] ${c.keyword}`;
+      const body = [`해설: ${c.keyword} (${c.id})`, `날짜: ${c.date}`, `버전: v${CFG.appVersion || ''} ${NATIVE ? 'app' : 'web'}`, '', '어느 부분이 이상한가요?', ''].join('\n');
+      S.reportState[c.id] = 'mail';
+      redraw();
+      window.location.href = `mailto:${rep.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      return;
+    }
     if (!rep.endpoint) {
       S.reportState[c.id] = 'unavailable';
       redraw();
@@ -386,6 +396,7 @@
         return;
       }
       box.appendChild(h('button', { class: 'btn ghost', type: 'button', disabled: st === 'sending', onclick: () => sendReport(c, redraw) }, icon('flag'), st === 'sending' ? '보내는 중…' : '내용이 이상해요'));
+      if (st === 'mail') box.appendChild(h('div', { class: 'status', role: 'status' }, '메일 앱을 열었어요. 어느 부분이 이상한지 적어서 보내 주세요.'));
       if (st === 'unavailable') box.appendChild(h('div', { class: 'status', role: 'status' }, '신고 접수를 준비하고 있어요. 조금만 기다려 주세요.'));
       if (st === 'failed') box.appendChild(h('div', { class: 'status warn', role: 'status' }, '전송하지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.'));
     };
