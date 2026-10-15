@@ -1,0 +1,17 @@
+{
+  "appId": "io.github.dodasifamily.whyttuji",
+  "appName": "왜뜨지",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_whyttuji",
+      "iconColor": "#3347FF"
+    },
+    "SystemBars": {
+      "insetsHandling": "css"
+    }
+  }
+}

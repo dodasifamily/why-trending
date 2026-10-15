@@ -1,0 +1,66 @@
+name: 웹 사이트 올리기 (GitHub Pages)
+
+# site/ 폴더가 바뀔 때마다 웹 사이트를 새로 올려요.
+# 앱도 이 주소에서 매일의 최신 해설(data/today.json)을 받아가요.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'scripts/content.mjs'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 콘텐츠 검사 (규칙을 어기면 올리지 않아요)
+        run: node scripts/content.mjs validate
+
+      - name: GitHub Pages 가 켜져 있는지 확인
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          build_type="$(gh api "repos/${{ github.repository }}/pages" --jq '.build_type' 2>/dev/null || true)"
+          if [ "$build_type" = "workflow" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=GitHub Pages 가 아직 꺼져 있어요::저장소 Settings → Pages → Build and deployment 의 Source 를 'GitHub Actions' 로 바꾸면, 다음 실행부터 사이트가 올라가요."
+          fi
+
+      - name: Pages 설정
+        if: steps.check.outputs.enabled == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: 사이트 파일 묶기
+        if: steps.check.outputs.enabled == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: 사이트 올리기
+        id: deployment
+        if: steps.check.outputs.enabled == 'true'
+        uses: actions/deploy-pages@v4
