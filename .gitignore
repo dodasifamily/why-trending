@@ -1,0 +1,25 @@
+# ── 비밀·서명 키: 절대 커밋하지 않아요 ─────────────────────────
+*.jks
+*.keystore
+keystore.properties
+local.properties
+.env
+.env.*
+*.pem
+*.p12
+
+# ── Node ──────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+
+# ── Android 빌드 산출물 ───────────────────────────────────────
+.gradle/
+**/build/
+*.aab
+*.apk
+*.iml
+.idea/
+
+# ── 기타 ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
