@@ -12,6 +12,11 @@ local.properties
 node_modules/
 npm-debug.log*
 
+# ── 빌드할 때마다 새로 만드는 폴더 ────────────────────────────
+app/android/
+app/ios/
+app/www/
+
 # ── Android 빌드 산출물 ───────────────────────────────────────
 .gradle/
 **/build/
