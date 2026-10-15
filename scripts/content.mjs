@@ -21,6 +21,9 @@ const TERMS_PATH = join(siteDir, 'data', 'terms.json');
 const GROUPS = ['meme', 'culture', 'sports', 'biz'];
 const MIN_CARDS_PER_DAY = 3;
 const MAX_CARDS_PER_DAY = 8;
+// '오늘 뜨는 말'인데 몇 달 전 기사만 있으면 지금 뜨는 게 아닐 수 있어요.
+// 카드 날짜 기준, 가장 최근 출처가 이 일수 안에 있어야 오늘의 카드로 올릴 수 있어요. (사전 항목에는 적용하지 않아요)
+const MAX_SOURCE_AGE_DAYS = 45;
 
 // 다루지 않기로 한 주제의 단서가 되는 말들이에요. 걸리면 그 카드는 빼거나 다시 써야 해요.
 const BLOCKED_WORDS = [
@@ -128,6 +131,24 @@ function validateCard(card, where) {
   if (Array.isArray(card.why)) card.why.forEach((w, i) => typeof w === 'string' && scanBlocked(where, `why[${i}]`, w));
 }
 
+function daysBetween(a, b) {
+  const [ay, am, ad] = a.split('-').map(Number);
+  const [by, bm, bd] = b.split('-').map(Number);
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
+}
+
+// 오늘의 카드: 가장 최근 출처가 너무 오래됐으면 올리지 않아요.
+function checkFreshness(card, where) {
+  if (!isRealDate(card.date) || !Array.isArray(card.sources)) return;
+  const dates = card.sources.map((s) => s && s.published).filter(isRealDate);
+  if (!dates.length) return;
+  const newest = dates.sort().at(-1);
+  const age = daysBetween(newest, card.date);
+  if (age > MAX_SOURCE_AGE_DAYS) {
+    err(where, `가장 최근 출처(${newest})가 카드 날짜보다 ${age}일 전이에요. 오늘의 카드는 ${MAX_SOURCE_AGE_DAYS}일 안의 출처가 있어야 해요 (사전에만 넣을 수는 있어요)`);
+  }
+}
+
 function validateToday(today) {
   const where = 'today.json';
   if (today.schema !== 1) err(where, 'schema 는 1 이어야 해요');
@@ -141,7 +162,9 @@ function validateToday(today) {
   }
   const ids = new Set();
   today.cards.forEach((c, i) => {
-    validateCard(c, `today.cards[${i}]${c && c.id ? ` (${c.id})` : ''}`);
+    const cardWhere = `today.cards[${i}]${c && c.id ? ` (${c.id})` : ''}`;
+    validateCard(c, cardWhere);
+    if (c && typeof c === 'object') checkFreshness(c, cardWhere);
     if (c && ids.has(c.id)) err(where, `id 가 중복돼요: ${c.id}`);
     if (c) ids.add(c.id);
     if (c && isRealDate(today.date) && c.date !== today.date) {
