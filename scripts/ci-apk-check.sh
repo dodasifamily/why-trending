@@ -39,9 +39,13 @@ else
   fail=1
 fi
 
-# 정확한 알람 권한은 일부러 쓰지 않아요 (구글 플레이가 별도 신고서를 요구할 수 있어요).
+# 정확한 알람 권한은 일부러 뺐어요. 알람·캘린더 앱이 아니면 구글 플레이가 이 권한이 든 앱을 올리지 못하게 해요.
+# (app/scripts/patch-android.mjs 가 알림 부품이 끼워 넣는 이 권한을 지워요. 남아 있으면 거기부터 보세요.)
 if grep -qE 'SCHEDULE_EXACT_ALARM|USE_EXACT_ALARM' "$WORK/manifest.txt"; then
-  report+=$'\n'"⚠️ 정확한 알람 권한이 들어 있어요 — 플레이 콘솔에서 별도 신고가 필요할 수 있어요"
+  report+=$'\n'"❌ 정확한 알람 권한이 남아 있어요 — 구글 플레이 심사에 걸릴 수 있어요"
+  fail=1
+else
+  report+=$'\n'"✅ 정확한 알람 권한 없음"
 fi
 
 printf '%s\n' "$report"

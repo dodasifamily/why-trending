@@ -4,6 +4,7 @@
 //
 // 하는 일
 //   1) 매니페스트에 AdMob 앱 ID 와 알림 권한 넣기 (AdMob ID 가 없으면 앱이 시작하자마자 꺼져요)
+//      + 알림 부품이 끼워 넣는 '정확한 알람' 권한은 빼기 (플레이 심사에 걸릴 수 있어요)
 //   2) versionCode / versionName 정하기 (구글 플레이는 올릴 때마다 versionCode 가 커져야 해요)
 //   3) 알림 작은 아이콘 만들기
 // 하나라도 못 고치면 일부러 실패해서, 잘못된 앱이 만들어지지 않게 해요.
@@ -45,6 +46,20 @@ for (const p of perms) {
     manifest = manifest.replace('</manifest>', `    <uses-permission android:name="${p}" />\n</manifest>`);
   }
 }
+
+// 알림 부품(local-notifications)이 '정확한 알람' 권한을 몰래 끼워 넣어요.
+// 구글 플레이는 알람·캘린더 앱이 아니면 이 권한이 든 앱을 올리지 못하게 해요.
+// 이 앱의 아침 알림은 몇 분 늦어도 괜찮아서, 권한을 빼면 부품이 알아서 '대략적인 시각' 방식으로 예약해요.
+const strip = ['android.permission.SCHEDULE_EXACT_ALARM', 'android.permission.USE_EXACT_ALARM'];
+if (!/xmlns:tools\s*=/.test(manifest)) {
+  if (!/<manifest\b/.test(manifest)) throw new Error('매니페스트에서 <manifest 를 찾지 못했어요');
+  manifest = manifest.replace(/<manifest\b/, '<manifest xmlns:tools="http://schemas.android.com/tools"');
+}
+for (const p of strip) {
+  if (!manifest.includes(`android:name="${p}"`)) {
+    manifest = manifest.replace('</manifest>', `    <uses-permission android:name="${p}" tools:node="remove" />\n</manifest>`);
+  }
+}
 fs.writeFileSync(manifestPath, manifest);
 
 // ---------- 2) 버전 ----------
@@ -77,6 +92,11 @@ const after = fs.readFileSync(manifestPath, 'utf8');
 for (const needle of ['com.google.android.gms.ads.APPLICATION_ID', 'android.permission.POST_NOTIFICATIONS', 'android.permission.INTERNET']) {
   if (!after.includes(needle)) throw new Error(`고친 뒤에도 매니페스트에 ${needle} 가 없어요`);
 }
+for (const p of strip) {
+  const re = new RegExp(`<uses-permission[^>]*android:name="${p.replace(/\./g, '\\.')}"[^>]*tools:node="remove"`);
+  if (!re.test(after)) throw new Error(`고친 뒤에도 매니페스트에 ${p} 제거 표시가 없어요`);
+}
+if (!/xmlns:tools="http:\/\/schemas\.android\.com\/tools"/.test(after)) throw new Error('매니페스트에 tools 이름공간이 없어요');
 console.log('✅ android 프로젝트 고치기 완료');
 console.log(`   versionCode=${versionCode} versionName=${versionName}`);
 console.log(`   AdMob 앱 ID=${admobAppId}`);
