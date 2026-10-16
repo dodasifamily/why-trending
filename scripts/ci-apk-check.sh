@@ -35,6 +35,13 @@ if [ "${FCM_ENABLED:-false}" = "true" ]; then
   check 'com.google.firebase.MESSAGING_EVENT' '푸시 알림(FCM) 받는 서비스'
   check 'com.google.firebase.messaging.default_notification_channel_id' '푸시 알림 기본 채널'
   check 'firebase_messaging_auto_init_enabled' '푸시 기기 등록은 알림을 켠 뒤에만 (자동 등록 끔)'
+  # 앱 화면(웹)이 푸시 부품을 쓰려면 안드로이드 쪽에 부품이 등록돼 있어야 해요 (Capacitor 가 cap sync 때 만드는 목록)
+  if unzip -p "$APK" assets/capacitor.plugins.json 2>/dev/null | grep -q 'firebase.messaging'; then
+    report+=$'\n'"✅ 푸시 부품이 앱에 등록됐어요 (capacitor.plugins.json)"
+  else
+    report+=$'\n'"❌ 푸시 부품이 capacitor.plugins.json 에 없어요 — 앱이 알림 설정을 쓰지 못해요"
+    fail=1
+  fi
   if "$BT/aapt2" dump resources "$APK" 2>/dev/null | grep -q 'string/google_app_id'; then
     report+=$'\n'"✅ Firebase 앱 ID(google_app_id)가 들어갔어요"
   else

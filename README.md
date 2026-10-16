@@ -32,7 +32,7 @@
 
 ### 분야별 알림 (푸시)
 
-- 알림을 켜면 앱이 **고른 분야**(`cat_meme`, `cat_sports` …)와 **받는 시각**(`h7`·`h8`·`h9`)을 FCM 주제로 구독해요. 끄면 구독을 모두 풀고 이 기기의 알림 등록도 지워요(`deleteToken`). 알림을 켜기 전에는 기기 등록을 하지 않아요(매니페스트의 `firebase_messaging_auto_init_enabled=false`). 앱 쪽 코드는 `site/js/app.js` 의 `syncPush()`·`wantedTopics()` 예요.
+- 알림을 켜면 앱이 **고른 분야**(`cat_meme`, `cat_sports` …)와 **받는 시각**(`h7`·`h8`·`h9`)을 FCM 주제로 구독해요. 끄면 구독을 모두 풀고 이 기기의 알림 등록도 지워요(`deleteToken`). 알림을 켜기 전에는 앱이 기기 등록을 요청하지 않아요(매니페스트의 `firebase_messaging_auto_init_enabled=false`. 한 번 켠 뒤에는 플러그인의 `getToken()` 이 자동 등록을 다시 켜서, 끈 뒤에도 Google 서비스가 등록 값을 다시 만들 수 있어요. 주제 구독이 없으니 알림은 오지 않아요). 앱 쪽 코드는 `site/js/app.js` 의 `syncPush()`·`wantedTopics()` 예요.
 - 보내는 쪽은 `scripts/push.mjs`(`push.yml`)예요. 오늘 해설이 있는 분야마다 "그 분야 **그리고** 그 시각" 조건(`'cat_sports' in topics && 'h8' in topics`)으로 한 번씩 보내요. 오늘 해설이 아직 안 올라왔으면 최대 25분 기다리고, 그래도 없으면 보내지 않아요(지난 해설로 '새 해설' 알림을 보내지 않아요). 알림을 누르면 그 분야의 첫 해설(`#/t/<id>`)이 열려요.
 - **켜지는 조건**: GitHub Secrets 에 Firebase 설정이 있어야 해요. 없으면 앱은 지금처럼 기기 안 알림(매일 같은 글)만 쓰고, `push.yml` 은 아무것도 보내지 않고 끝나요.
   - `GOOGLE_SERVICES_JSON`: Firebase 콘솔에서 안드로이드 앱(패키지 이름 `io.github.dodasifamily.issuewhy`)을 등록하고 받은 `google-services.json` 의 내용 전체. 앱을 만들 때(`android.yml` → `app/scripts/prepare-fcm.mjs`) 써요. 패키지 이름이 다르면 빌드가 이유를 알려 주며 멈춰요.
