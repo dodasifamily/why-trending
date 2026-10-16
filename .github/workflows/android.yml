@@ -82,6 +82,10 @@ jobs:
           chmod +x gradlew
           ../../scripts/ci-run.sh "APK 빌드" -- ./gradlew assembleDebug --no-daemon --stacktrace
 
+      # 만들어진 APK 안에 AdMob ID·권한·목표 SDK 가 제대로 들어갔는지 확인해요. (빠지면 여기서 멈춰요)
+      - name: APK 안쪽 점검
+        run: bash scripts/ci-run.sh "APK 점검" -- bash scripts/ci-apk-check.sh
+
       - name: 시험용 APK 올리기
         uses: actions/upload-artifact@v4
         with:
