@@ -1,0 +1,7 @@
+{
+  "hours": [8],
+  "dry_run": false,
+  "validate_only": true,
+  "use_latest": true,
+  "nonce": "validate-1"
+}
