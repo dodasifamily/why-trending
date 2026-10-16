@@ -27,7 +27,8 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # 컴퓨터 종류를 고정해요 (ubuntu-latest 는 10월 19일부터 우분투 26 으로 바뀐대요)
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
