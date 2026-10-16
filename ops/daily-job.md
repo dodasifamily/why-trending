@@ -34,7 +34,7 @@ GitHub 저장소 dodasifamily/why-trending 의 site/data/today.json 을 '오늘(
   - 틱톡: 위 https://issueitnow.com/kr/tiktok/ 에 틱톡 크리에이티브 센터 한국 인기 해시태그(7일·30일)가 정리돼 있어요. 숫자가 전날과 똑같으면 갱신이 멈춘 거니 가볍게만 봐요. 틱톡 원본(ads.tiktok.com)은 로그인과 자바스크립트가 필요해서 읽지 못해요.
   - 스레드(Threads): 로그인 없이 읽을 수 있는 화제 목록이 없어요. 직접 읽으려 하지 말고, 기사에 '스레드에서 화제'라고 적힌 소재를 WebSearch 로 찾아요.
   - 소셜에서만 뜨고 기사가 없는 것(팬덤 투표 해시태그, 루머, 특정인을 향한 글)은 카드로 만들지 않아요. 보고에 '소셜에서만'으로 적어 두면 돼요.
-- **해외 화제**(사용자 요청): Google 급상승 미국 https://trends.google.com/trending/rss?geo=US · 일본 https://trends.google.com/trending/rss?geo=JP (한국판과 같은 형식이고, 항목마다 그 나라 매체의 기사 제목이 3개쯤 붙어 있어서 '해외 매체가 몇 곳 다뤘는지' 세기 좋아요. 정치·전쟁·사건·날씨가 많아요. 제품 공개·연예·스포츠·게임·밈만 골라요. 예: 신제품 공개 직후에는 미국 급상승 맨 위가 그 제품 이름이에요.) 한국 연예 소식이 해외에서 얼마나 퍼졌는지는 영문 한국 매체(Korea Herald, Korea JoongAng Daily)나 Soompi·Allkpop 기사로 봐요.
+- **해외 화제**(사용자 요청): Google 급상승 미국 https://trends.google.com/trending/rss?geo=US · 일본 https://trends.google.com/trending/rss?geo=JP (한국판과 같은 형식이고, 항목마다 그 나라 매체의 기사 제목이 3개쯤 붙어 있어서 '해외 매체가 몇 곳 다뤘는지' 세기 좋아요. 정치·전쟁·사건·날씨가 많아요. 제품 공개·연예·스포츠·게임·밈만 골라요. 예: 신제품 공개 직후에는 검색량이 가장 큰 항목(예: 'apple store')에 그 제품 기사가 붙어 있어요. 항목 이름은 검색어라서 제품 이름과 다를 수 있으니 붙은 기사 제목을 보세요.) 한국 연예 소식이 해외에서 얼마나 퍼졌는지는 영문 한국 매체(Korea Herald, Korea JoongAng Daily)나 Soompi·Allkpop 기사로 봐요.
 - 영어로 막연히 검색하면('biggest tech news today') 광고성 글만 나와요. **소재 이름이나 매체 이름을 넣어서** 검색하세요(예: 'iPhone Duo preorder TechCrunch'). WebSearch 의 allowed_domains 는 theverge.com·engadget.com·cnet.com 같은 일부 도메인에서 거절돼요(PROXY_REJECTED). 거절되면 그 도메인을 빼고 다시 하거나 쓰지 마세요. 이런 사이트는 우회해서 읽지 않고 다른 매체 기사를 쓰세요. (기사 제목만 보고 '이 매체도 다뤘다'고 세는 건 괜찮아요.)
 - 위 페이지들은 서로 관계가 없으니 **한 번에 여러 개를 동시에** 열어요. 그만큼 시간이 줄어요(알림이 오늘 카드를 07:07 부터 읽어 가요).
 
