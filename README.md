@@ -41,7 +41,8 @@
 
 - 시험용 앱(폰에서 바로 설치): https://github.com/dodasifamily/why-trending/releases/download/test-latest/whyttuji-test.apk
 - 시험용 앱의 서명 키(디버그 키) 파일은 Actions 캐시(`debug-keystore-v2`)에 두고 계속 같은 키로 서명해요 (`app/scripts/patch-android.mjs` 가 Gradle 에 그 경로를 알려줘요). 그래서 새 시험용 앱을 폰에 **덮어 설치**할 수 있어요. 캐시가 7일 넘게 안 쓰여 지워지면 키가 바뀌어서, 그때는 한 번 앱을 지우고 다시 설치해야 해요. 이 키는 비밀 키가 아니고 출시에는 쓰지 않아요 (출시용 키는 GitHub Secrets 에만 둬요).
-- 처음 한 번만: 저장소 Settings → Pages → Source 를 `GitHub Actions` 로 바꿔요.
+- 앱의 영구 ID(패키지 이름): `io.github.dodasifamily.issuewhy` (2026-10-16 확정, `app/capacitor.config.json` 의 `appId` 와 `server.hostname`). 구글 플레이에 처음 올리면 바꿀 수 없어요. 문의 이메일은 `issuewhyhelp@gmail.com` (`site/js/config.js` 의 `report.email`, 개인정보처리방침).
+- GitHub Pages 는 켜져 있어요 (Source = GitHub Actions). 사이트 주소: https://dodasifamily.github.io/why-trending/
 - 출시용 서명 키: Settings → Secrets and variables → Actions 에 `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` 를 등록해요.
 - 광고: `site/js/config.js` 의 `ads` 와 `app/app.config.json` 의 AdMob 앱 ID 는 지금 구글 테스트 값이에요. 출시 전에 실제 값으로 바꿔요.
 - '내용이 이상해요' 신고: `site/js/config.js` 의 `report.endpoint`(폼) 또는 `report.email`(메일)을 채우면 켜져요.

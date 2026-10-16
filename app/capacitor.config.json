@@ -1,10 +1,10 @@
 {
-  "appId": "io.github.dodasifamily.whyttuji",
+  "appId": "io.github.dodasifamily.issuewhy",
   "appName": "왜뜨지",
   "webDir": "www",
   "server": {
     "androidScheme": "https",
-    "hostname": "io.github.dodasifamily.whyttuji"
+    "hostname": "io.github.dodasifamily.issuewhy"
   },
   "plugins": {
     "LocalNotifications": {

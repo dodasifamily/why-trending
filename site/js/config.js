@@ -27,6 +27,6 @@ window.WT_CONFIG = {
   report: {
     endpoint: '',
     fields: { id: '', keyword: '', note: '' },
-    email: ''
+    email: 'issuewhyhelp@gmail.com'
   }
 };
