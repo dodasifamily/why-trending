@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "123456789012",
+    "project_id": "whyttuji-fake-test",
+    "storage_bucket": "whyttuji-fake-test.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:123456789012:android:0123456789abcdef012345",
+        "android_client_info": {
+          "package_name": "io.github.dodasifamily.issuewhy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyFAKE-FAKE-FAKE-FAKE-FAKE-FAKE-FAK"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
