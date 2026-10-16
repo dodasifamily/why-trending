@@ -67,17 +67,25 @@ case "${KEY_CACHE_HIT:-}" in
   true) report+=$'\n'"🔑 서명 키: 저장해 둔 키를 불러왔어요" ;;
   *)    report+=$'\n'"🔑 서명 키: 저장된 키가 없어 새로 만들었어요 (이번 빌드부터 저장해요)" ;;
 esac
+norm() { tr -d ': ' | tr 'A-F' 'a-f'; }
 sig_out="$("$BT/apksigner" verify --print-certs "$APK" 2>&1)"
-cert="$(printf '%s\n' "$sig_out" | sed -n 's/^Signer #1 certificate SHA-256 digest: *//p' | head -n 1)"
-src="APK"
-if [ -z "$cert" ] && command -v keytool >/dev/null 2>&1 && [ -f "$HOME/.android/debug.keystore" ]; then
-  cert="$(keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey 2>/dev/null | sed -n 's/^Certificate fingerprint (SHA-256): *//p' | head -n 1)"
-  src="키 파일"
+apk_cert="$(printf '%s\n' "$sig_out" | sed -n 's/^.*certificate SHA-256 digest: *//p' | head -n 1 | norm)"
+ks="${WHYTTUJI_DEBUG_KEYSTORE:-}"
+ks_cert=""
+if [ -n "$ks" ] && [ -f "$ks" ] && command -v keytool >/dev/null 2>&1; then
+  ks_cert="$(keytool -list -keystore "$ks" -storepass android -alias androiddebugkey 2>/dev/null | sed -n 's/^Certificate fingerprint (SHA-256): *//p' | head -n 1 | norm)"
 fi
-if [ -n "$cert" ]; then
-  report+=$'\n'"서명 인증서 지문(SHA-256, ${src}에서 읽음): ${cert}"
+if [ -z "$apk_cert" ]; then
+  report+=$'\n'"서명 인증서 지문을 APK 에서 읽지 못했어요: $(printf '%s' "$sig_out" | head -n 2 | tr '\n' ' ' | cut -c1-240)"
 else
-  report+=$'\n'"서명 인증서 지문을 읽지 못했어요: $(printf '%s' "$sig_out" | head -n 2 | tr '\n' ' ' | cut -c1-240)"
+  report+=$'\n'"서명 인증서 지문(SHA-256): ${apk_cert}"
+  if [ -z "$ks_cert" ]; then
+    report+=$'\n'"(저장해 둔 키 파일의 지문은 읽지 못했어요)"
+  elif [ "$ks_cert" = "$apk_cert" ]; then
+    report+=$'\n'"✅ 저장해 둔 키로 서명됐어요"
+  else
+    report+=$'\n'"⚠️ 저장해 둔 키(${ks_cert})로 서명되지 않았어요 — 폰에서 덮어 설치가 안 될 수 있어요"
+  fi
 fi
 
 printf '%s\n' "$report"

@@ -7,6 +7,7 @@
 //      + 알림 부품이 끼워 넣는 '정확한 알람' 권한은 빼기 (플레이 심사에 걸릴 수 있어요)
 //   2) versionCode / versionName 정하기 (구글 플레이는 올릴 때마다 versionCode 가 커져야 해요)
 //   3) 알림 작은 아이콘 만들기
+//   4) 시험용(디버그) 앱 서명 키를 환경 변수로 받은 고정 키로 바꾸기 (폰에서 덮어 설치되게)
 // 하나라도 못 고치면 일부러 실패해서, 잘못된 앱이 만들어지지 않게 해요.
 
 import fs from 'node:fs';
@@ -68,6 +69,27 @@ const vcRe = /versionCode\s*=?\s*\d+/;
 const vnRe = /versionName\s*=?\s*"[^"]*"/;
 if (!vcRe.test(gradle) || !vnRe.test(gradle)) throw new Error('build.gradle 에서 versionCode/versionName 을 찾지 못했어요');
 gradle = gradle.replace(vcRe, `versionCode ${versionCode}`).replace(vnRe, `versionName "${versionName}"`);
+const SIGN_MARK = '// ---- 왜뜨지: 시험용 서명 키 고정 ----';
+if (!gradle.includes(SIGN_MARK)) {
+  // 환경 변수 WHYTTUJI_DEBUG_KEYSTORE 에 키 파일 경로가 있으면 시험용(디버그) 앱을 그 키로 서명해요. 없으면 기본 동작이에요.
+  // 빌드마다 같은 키여야 폰에서 새 시험용 앱을 지우지 않고 덮어 설치할 수 있어요. (출시용 키가 아니에요)
+  gradle += `
+${SIGN_MARK}
+def whyttujiDebugKeystore = System.getenv('WHYTTUJI_DEBUG_KEYSTORE')
+if (whyttujiDebugKeystore) {
+    android {
+        signingConfigs {
+            debug {
+                storeFile file(whyttujiDebugKeystore)
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
+    }
+}
+`;
+}
 fs.writeFileSync(gradlePath, gradle);
 
 // ---------- 3) 알림 작은 아이콘 (흰색 말풍선) ----------
@@ -89,6 +111,7 @@ fs.writeFileSync(
 
 // ---------- 확인 ----------
 const after = fs.readFileSync(manifestPath, 'utf8');
+if (!fs.readFileSync(gradlePath, 'utf8').includes(SIGN_MARK)) throw new Error('build.gradle 에 시험용 서명 키 설정이 들어가지 않았어요');
 for (const needle of ['com.google.android.gms.ads.APPLICATION_ID', 'android.permission.POST_NOTIFICATIONS', 'android.permission.INTERNET']) {
   if (!after.includes(needle)) throw new Error(`고친 뒤에도 매니페스트에 ${needle} 가 없어요`);
 }
