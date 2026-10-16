@@ -6,7 +6,7 @@
 //
 // 옵션: --site <폴더>   기본값은 site
 //
-// 규칙의 목적: 출처 없는 내용, 민감한 주제, 너무 긴 글이 앱에 올라가지 않게 막는 안전장치예요.
+// 규칙의 목적: 출처 없는 내용, 민감한 주제, 너무 긴 글, 출처가 불분명한 영상이 앱에 올라가지 않게 막는 안전장치예요.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -24,6 +24,22 @@ const MAX_CARDS_PER_DAY = 8;
 // '오늘 뜨는 말'인데 몇 달 전 기사만 있으면 지금 뜨는 게 아닐 수 있어요.
 // 카드 날짜 기준, 가장 최근 출처가 이 일수 안에 있어야 오늘의 카드로 올릴 수 있어요. (사전 항목에는 적용하지 않아요)
 const MAX_SOURCE_AGE_DAYS = 45;
+
+// 해설 화면에 붙이는 영상 규칙.
+// 저작권 때문에 기사 사진은 가져다 쓰지 않아요. 대신 '출처로 단 기사 페이지에 매체가 직접 실어 둔 유튜브 영상'만
+// 미리보기(썸네일)와 재생 링크로 보여줘요. 그래서 영상에는 반드시 그 기사 주소(from)가 따라붙고,
+// 그 기사는 카드의 출처 목록에도 들어 있어야 해요. (기사 페이지에 영상이 정말 있는지는 갱신 담당이 직접 열어 확인해요)
+// 목록에 없는 매체의 기사에서는 영상을 가져오지 않아요. 새 매체를 허용하려면 여기에 추가해요.
+const VIDEO_FROM_HOSTS = [
+  'www.ytn.co.kr', // 확인됨: 기사 페이지에 자사 유튜브 영상을 싣는 매체
+  'www.yna.co.kr',
+  'www.yonhapnewstv.co.kr',
+  'news.sbs.co.kr',
+  'imnews.imbc.com',
+  'news.kbs.co.kr',
+  'news.jtbc.co.kr'
+];
+const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
 
 // 다루지 않기로 한 주제의 단서가 되는 말들이에요. 걸리면 그 카드는 빼거나 다시 써야 해요.
 const BLOCKED_WORDS = [
@@ -129,6 +145,37 @@ function validateCard(card, where) {
     if (typeof card[f] === 'string') scanBlocked(where, f, card[f]);
   }
   if (Array.isArray(card.why)) card.why.forEach((w, i) => typeof w === 'string' && scanBlocked(where, `why[${i}]`, w));
+
+  validateMedia(card, where);
+}
+
+// media 는 선택 항목이에요. 없으면 앱이 분야별 그림 카드를 대신 보여줘요.
+// 형식: "media": [{ "type": "video", "provider": "youtube", "id": "11글자", "from": "출처로 단 기사 주소" }]
+function validateMedia(card, where) {
+  if (card.media === undefined) return;
+  if (!Array.isArray(card.media) || card.media.length !== 1) {
+    return err(where, 'media 는 영상 1개짜리 목록이어야 해요 (영상이 없으면 media 항목 자체를 빼세요)');
+  }
+  card.media.forEach((m, i) => {
+    const w = `${where}.media[${i}]`;
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return err(w, '객체가 아니에요');
+    if (m.type !== 'video') return err(w, "type 은 'video' 만 쓸 수 있어요");
+    const extra = Object.keys(m).filter((k) => !['type', 'provider', 'id', 'from'].includes(k));
+    if (extra.length) err(w, `쓸 수 없는 항목이 있어요: ${extra.join(', ')}`);
+    if (m.provider !== 'youtube') err(w, "provider 는 'youtube' 여야 해요");
+    if (typeof m.id !== 'string' || !YOUTUBE_ID.test(m.id)) err(w, 'id 는 유튜브 영상 주소의 11글자 번호여야 해요 (영문·숫자·-·_)');
+    const from = Array.isArray(card.sources) ? card.sources.find((s) => s && s.url === m.from) : undefined;
+    if (!from) {
+      err(w, 'from 은 이 카드의 출처(sources)에 들어 있는 기사 주소여야 해요');
+    } else {
+      try {
+        const host = new URL(from.url).hostname;
+        if (!VIDEO_FROM_HOSTS.includes(host)) err(w, `${host} 기사에서는 영상을 가져오지 않아요 (허용 매체: ${VIDEO_FROM_HOSTS.join(', ')})`);
+      } catch {
+        /* 주소 형식 오류는 sources 검사에서 이미 알려줘요 */
+      }
+    }
+  });
 }
 
 function daysBetween(a, b) {

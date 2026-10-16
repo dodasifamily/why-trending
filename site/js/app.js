@@ -92,7 +92,13 @@
     flag: '<path d="M6 21V4M6 4h11l-2 4 2 4H6"></path>',
     search: '<circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4-4"></path>',
     info: '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v6M12 7.5v.01"></path>',
-    out: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path>'
+    out: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path>',
+    play: '<path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="none"></path>',
+    // 분야별 그림 카드에 쓰는 큰 아이콘
+    meme: '<path d="M21 12a8 8 0 0 1-11.7 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"></path><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"></path>',
+    culture: '<path d="M9 18V6.5l10-2V16"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle>',
+    sports: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"></path><path d="M8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3"></path><path d="M12 13v4M9 20h6M10 17h4"></path>',
+    biz: '<path d="M5.5 8h13l1 12h-15z"></path><path d="M9 8V7a3 3 0 0 1 6 0v1"></path>'
   };
   function icon(name, size) {
     const s = size || 18;
@@ -111,6 +117,7 @@
   }
 
   function setView(nodes, keepScroll) {
+    view.removeAttribute('data-card-id');
     view.textContent = '';
     append(view, nodes);
     if (!keepScroll) view.scrollTop = 0;
@@ -404,6 +411,90 @@
     return box;
   }
 
+  // ---------- 사진·영상 ----------
+  // 기사에 실린 사진은 저작권 때문에 쓰지 않아요. 출처로 단 기사에 매체가 직접 실어 둔 유튜브 영상은 미리보기(썸네일)와
+  // 재생으로 보여주고, 영상이 없는 해설에는 분야별 그림 카드를 보여줘요.
+  // 데이터에서 온 값은 믿지 않고, 영상 주소는 11글자 번호로 우리가 직접 만들어요.
+  const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
+  const ART_GROUPS = ['meme', 'culture', 'sports', 'biz'];
+
+  function videoOf(c) {
+    const list = Array.isArray(c.media) ? c.media : [];
+    const m = list.find((x) => x && x.type === 'video' && x.provider === 'youtube' && YOUTUBE_ID.test(String(x.id)));
+    if (!m) return null;
+    const src = (c.sources || []).find((s) => s && s.url === m.from);
+    return { id: String(m.id), outlet: src ? String(src.name || '') : '', title: src ? String(src.title || '') : c.keyword };
+  }
+
+  /** 큰 미리보기 → 보통 미리보기 순서로 시도해요. 둘 다 안 되면 onFail */
+  function loadThumb(img, id, onFail) {
+    const urls = [`https://i.ytimg.com/vi/${id}/maxresdefault.jpg`, `https://i.ytimg.com/vi/${id}/hqdefault.jpg`];
+    let i = 0;
+    const next = () => {
+      if (i < urls.length) img.src = urls[i++];
+      else onFail();
+    };
+    img.addEventListener('error', next);
+    img.addEventListener('load', () => {
+      // 큰 미리보기가 없는 영상은 유튜브가 아주 작은 대체 그림을 주기도 해서, 그럴 땐 다음 크기를 써요
+      if (img.naturalWidth > 0 && img.naturalWidth < 200 && i < urls.length) next();
+    });
+    next();
+  }
+
+  function artBlock(c) {
+    const g = ART_GROUPS.includes(c.group) ? c.group : 'meme';
+    return h('div', { class: `art art-${g}`, 'aria-hidden': 'true' }, icon(g, 64));
+  }
+
+  function mediaBlock(c) {
+    const v = videoOf(c);
+    if (!v) return artBlock(c);
+    const watch = `https://www.youtube.com/watch?v=${v.id}`;
+    // 웹에서는 눌러서 그 자리에서 재생해요. 앱(안드로이드)에서는 유튜브로 열어요.
+    // (앱 안 재생은 기기마다 막힐 수 있어서, config.js 의 media.inlineInApp 을 true 로 바꿔 시험한 뒤에 켜요)
+    const inline = !NATIVE || !!(CFG.media && CFG.media.inlineInApp === true);
+    const img = h('img', { alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
+    const play = h(
+      'a',
+      { class: 'vplay', href: watch, target: '_blank', rel: 'noopener noreferrer', 'aria-label': `영상 보기: ${v.title}` },
+      img,
+      h('span', { class: 'pb', 'aria-hidden': 'true' }, icon('play', 28))
+    );
+    const frame = h('div', { class: 'vframe' }, play);
+    loadThumb(img, v.id, () => {
+      img.remove();
+      play.classList.add('nothumb');
+    });
+    if (inline) {
+      play.addEventListener('click', (e) => {
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        frame.textContent = '';
+        frame.appendChild(
+          h('iframe', {
+            src: `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&playsinline=1`,
+            title: v.title,
+            allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen',
+            allowfullscreen: true,
+            referrerpolicy: 'strict-origin-when-cross-origin'
+          })
+        );
+      });
+    }
+    return h(
+      'figure',
+      { class: 'media' },
+      frame,
+      h(
+        'figcaption',
+        { class: 'vcap' },
+        h('span', null, v.outlet ? `${v.outlet} 기사에 실린 영상 · YouTube` : '관련 영상 · YouTube'),
+        h('a', { href: watch, target: '_blank', rel: 'noopener noreferrer' }, 'YouTube에서 보기', icon('out', 14))
+      )
+    );
+  }
+
   function sourceList(c) {
     return h(
       'ul',
@@ -451,6 +542,8 @@
       setView([top, h('div', { class: 'box' }, h('h2', null, '해설을 찾지 못했어요'), h('p', null, '지워졌거나 아직 올라오지 않은 해설이에요.'), h('button', { class: 'btn primary', type: 'button', onclick: () => go('/', true) }, '오늘 화면으로'))]);
       return;
     }
+    // 데이터를 새로 받아 화면을 다시 그릴 때, 같은 해설에서 영상이 재생 중이면 그대로 두어요
+    if (keepScroll && view.getAttribute('data-card-id') === c.id && view.querySelector('.vframe iframe')) return;
     document.title = `${c.keyword} – 왜뜨지?`;
     const nodes = [
       h(
@@ -462,6 +555,7 @@
       h('span', { class: 'pill' }, c.cat),
       h('h1', { class: 'dh1' }, h('span', { class: 'hl' }, c.keyword)),
       h('p', { class: 'dline' }, c.line),
+      mediaBlock(c),
       section('뜻', h('p', null, c.meaning)),
       section('왜 뜨지?', c.why.map((t, i) => h('div', { class: 'why' }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 't' }, t))))
     ];
@@ -469,6 +563,7 @@
     nodes.push(section('출처', sourceList(c), h('p', { class: 'note', style: 'margin:10px 4px 0' }, AI_NOTE)));
     nodes.push(h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', onclick: () => shareCard(c) }, '친구에게 공유하기'), reportArea(c)));
     setView(nodes, keepScroll);
+    view.setAttribute('data-card-id', c.id);
   }
 
   // ---------- 사전 ----------
