@@ -6,6 +6,8 @@ name: 분야별 알림 보내기 (FCM)
 #  - 직접 해 보려면 Actions 탭에서 '알림 보내기'를 눌러요 (받는 시각을 고르고, 처음에는 '보내지 않고 내용만 보기' 로 확인해요).
 #  - 시험 보내기: ops/push-now.json 을 바꾼 커밋이 main 에 올라오면 그 파일에 적힌 대로 보내요 (예: {"hours":[8], "dry_run": false}).
 #    dry_run 을 false 로 분명히 적지 않으면 보내지 않고 내용만 보여줘요. 저장소에 쓰기 권한이 있는 사람만 올릴 수 있어요.
+#    {"validate_only": true} 를 더하면 FCM 에 '검사만' 부탁하고(기기에는 안 가요), {"use_latest": true} 를 더하면 오늘 해설이 아직 없는
+#    자정~아침에도 저장소에 올라와 있는 가장 최근 해설로 시험해요.
 # 보내는 방법과 규칙은 scripts/push.mjs 에 있어요.
 
 on:
@@ -53,6 +55,8 @@ jobs:
       - name: 알림 보내기
         env:
           FCM_SERVICE_ACCOUNT_JSON: ${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}
+          # 앱에 넣은 Firebase 설정도 넘겨서, 서비스 계정 키와 같은 프로젝트인지 확인해요 (다르면 알림이 기기에 닿지 않아요). 값은 출력하지 않아요.
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
           # 예약 실행은 어느 시각 알림인지 예약 시각으로 정해요 (07:07 → 7, 08:07 → 8, 09:07 → 9)
           HOUR: ${{ github.event_name == 'workflow_dispatch' && inputs.hour || github.event.schedule == '7 22 * * *' && '7' || github.event.schedule == '7 23 * * *' && '8' || '9' }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}

@@ -12,6 +12,9 @@
 //             {"hours":[8], "dry_run": false} — dry_run 을 false 로 분명히 적었을 때만 진짜로 보내요.
 //             {"hours":[8], "dry_run": false, "validate_only": true} — FCM 에 '검사만' 부탁해요. 기기에는 아무것도 가지 않고,
 //             키·프로젝트·FCM 설정이 맞는지만 확인돼요.
+//             {"hours":[8], "dry_run": false, "use_latest": true} — 오늘 해설이 아직 안 올라온 시각(자정~아침 해설 갱신 전)에도
+//             시험할 수 있게, 저장소에 올라와 있는 가장 최근 해설로 해요. true 라고 분명히 적었을 때만 켜지고,
+//             시험 보내기 파일에서만 쓸 수 있어요 (예약 실행은 항상 '오늘 해설'만 보내요).
 //   GOOGLE_SERVICES_JSON  (선택) 앱에 넣은 Firebase 설정. 있으면 서비스 계정 키와 같은 프로젝트인지 확인해요.
 //
 // 하는 일
@@ -246,6 +249,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   let dry = args.dryRun || env.DRY_RUN === '1' || String(env.DRY_RUN).toLowerCase() === 'true';
   let waitMin = Math.max(0, Number(args.wait ?? env.WAIT_MIN ?? 0) || 0);
   let validateOnly = false;
+  let useLatest = false;
 
   // 시험 보내기: ops/push-now.json 이 바뀐 커밋이 main 에 올라오면 push.yml 이 파일에 적힌 대로 보내요.
   if (env.PUSH_FILE) {
@@ -259,6 +263,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     hours = (Array.isArray(cfg && cfg.hours) ? cfg.hours : [cfg && cfg.hour !== undefined ? cfg.hour : 8]).map(Number);
     dry = !(cfg && cfg.dry_run === false); // false 라고 분명히 적었을 때만 진짜로 보내요
     validateOnly = !!(cfg && cfg.validate_only === true); // true 라고 분명히 적었을 때만 '검사만' 해요
+    useLatest = !!(cfg && cfg.use_latest === true); // true 라고 분명히 적었을 때만 '올라와 있는 가장 최근 해설'로 해요 (시험 전용)
     waitMin = 0;
   }
   hours = [...new Set(hours)];
@@ -290,8 +295,20 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     return 1;
   }
 
-  const date = kstDate(now());
+  let date = kstDate(now());
   const groups = (readLocal ? readLocal('categories') : readJson('site/data/categories.json')).groups;
+  if (useLatest) {
+    let latest = null;
+    try {
+      latest = (readLocal ? readLocal('today') : readJson('site/data/today.json')).date;
+    } catch (e) {
+      latest = null;
+    }
+    if (typeof latest === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(latest) && latest !== date) {
+      notice('가장 최근 해설로 시험해요', `오늘(${date}) 해설이 아직 없어서, 저장소에 올라와 있는 ${latest} 해설로 시험해요. (시험 보내기에서만 쓰는 옵션이에요)`);
+      date = latest;
+    }
+  }
   const today = await loadToday({
     date,
     waitMin,
