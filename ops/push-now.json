@@ -1,7 +1,5 @@
 {
-  "hours": [8],
+  "hours": [7, 8, 9],
   "dry_run": false,
-  "validate_only": true,
-  "use_latest": true,
-  "nonce": "validate-1"
+  "nonce": "test-1"
 }
