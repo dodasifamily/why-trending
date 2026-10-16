@@ -42,8 +42,8 @@ jobs:
       - name: 콘텐츠 검사 (규칙을 어기면 올리지 않아요)
         run: node scripts/content.mjs validate
 
-      # 앱 첫 화면의 '지난 며칠' 목록은 사전(terms.json)에서 최근 7일만 뽑아 만들어요. 올릴 때마다 새로 만들고, 저장소에는 두지 않아요.
-      - name: 최근 7일 해설 목록 만들기
+      # 앱 첫 화면의 분야별 목록은 오늘 해설과 이 파일(사전 terms.json 에서 최근 14일만 뽑은 것)을 합쳐 만들어요. 올릴 때마다 새로 만들고, 저장소에는 두지 않아요.
+      - name: 최근 14일 해설 목록 만들기
         run: node scripts/content.mjs recent
 
       - name: GitHub Pages 가 켜져 있는지 확인

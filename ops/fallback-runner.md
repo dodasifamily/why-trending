@@ -23,6 +23,7 @@
    - `node scripts/content.mjs validate` 통과 (오늘 카드 7개 이상·분야 5곳 이상)
    - `git show --stat origin/main` 에 `site/data/today.json`, `site/data/terms.json` 두 파일만 있는지
    - 올린 카드의 분야 분포와 '최근 14일 해설이 5개 미만인 분야' 안내(validate 출력)를 봐 두고, 같은 분야가 며칠째 5개 아래면 찰리 님께 한 줄로 알려요.
+   - (선택) 사이트에 반영됐는지 볼 때는 `gh run list --repo dodasifamily/why-trending --workflow pages.yml --limit 2` 로 배포가 성공(보통 2~3분)했는지 본 다음, `https://dodasifamily.github.io/why-trending/data/today.json?cb=<아무 숫자>` 를 WebFetch 로 열어요. **주소 뒤에 `?cb=숫자` 를 꼭 붙여요.** 안 붙이면 WebFetch 가 예전 내용(몇 시간 전 것)을 돌려줘서 배포가 안 된 것처럼 보여요. 큰 파일(`recent.json`)은 앞쪽 4만 6천 자쯤까지만 보여서 카드 맨 끝 몇 개는 안 보일 수 있어요(배포 실패가 아니에요).
 
    작업이 실패하면(오류·시간 초과) 한 번만 다시 해요. 그래도 안 되면 올리지 않고 이유를 찰리 님께 알려요. (앱은 갱신이 2일 넘게 없을 때만 '업데이트가 조금 늦어지고 있어요'를 보여줘서, 하루 빠지는 건 괜찮아요.)
 4. **내일을 걸어 두기 (꼭 마지막에 해요)** — `mcp__claude-code-remote__send_later` 로 내일 06:40 KST 에 같은 일을 하라는 메시지를 걸어요. (도구가 안 보이면 ToolSearch 로 불러와요.)
