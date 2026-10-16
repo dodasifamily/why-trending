@@ -3,7 +3,8 @@
   "appName": "왜뜨지",
   "webDir": "www",
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "hostname": "io.github.dodasifamily.whyttuji"
   },
   "plugins": {
     "LocalNotifications": {

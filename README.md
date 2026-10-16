@@ -26,7 +26,8 @@
 - **기사 사진은 쓰지 않아요.** 저작권이 매체에 있어서예요. 위키미디어 등 자유 이용 사진도 라이선스를 기계로 확인할 수 없어서 넣지 않아요.
 - 영상은 카드의 `sources` 로 단 **기사 페이지가 직접 싣고 있는 유튜브 영상**만 허용해요. 형식은 `"media": [{"type":"video","provider":"youtube","id":"<11글자>","from":"<sources 에 있는 그 기사 주소>"}]` 이고, 영상은 카드당 1개예요.
 - `from` 의 주소는 `scripts/content.mjs` 의 `VIDEO_FROM_HOSTS` (YTN·연합뉴스·연합뉴스TV·SBS·MBC·KBS·JTBC) 에 있어야 하고, 검사(`validate`)가 이걸 확인해요. 기사에서 영상 번호를 확실히 확인하지 못했다면 `media` 를 빼요.
-- 앱(안드로이드)에서는 영상을 유튜브로 열고, 웹에서는 그 자리에서 재생해요. 앱 안에서 바로 재생하려면 `site/js/config.js` 의 `media.inlineInApp` 을 `true` 로 바꾸고 폰에서 먼저 시험해요(WebView 에서 유튜브 오류 153 이 날 수 있어요).
+- 영상은 웹·앱 모두 그 자리에서 재생해요. 유튜브는 플레이어를 넣은 쪽이 누구인지 Referer 로 알려주길 요구하고 앱이면 앱 ID 여야 해서, `app/capacitor.config.json` 의 `server.hostname` 을 앱 ID 와 같게 두었어요(앱 화면 주소가 `https://<앱 ID>/` 가 돼요). **패키지 이름(appId)을 바꾸면 hostname 도 같이 바꿔요.** 빌드(`scripts/ci-apk-check.sh`)가 이 둘이 같은지 확인해요.
+- 앱 안에서 재생이 막히면(유튜브가 오류 2·5·153 을 알려줄 때) 그 기기는 기억해 두었다가 다음부터 곧바로 유튜브 앱·브라우저로 열어요. 앱 화면은 전체 화면 전환을 지원하지 않아서 전체 화면 버튼은 숨겨요. 그 자리 재생을 끄려면 `site/js/config.js` 의 `media.inlineInApp` 을 `false` 로 바꿔요.
 
 ## 어떻게 돌아가나요 (운영 메모)
 

@@ -447,13 +447,81 @@
     return h('div', { class: `art art-${g}`, 'aria-hidden': 'true' }, icon(g, 64));
   }
 
+  // ----- 영상 재생 (웹·앱 모두 그 자리에서 재생해요) -----
+  // 유튜브는 플레이어를 넣은 쪽이 '누구인지' Referer 로 알려주길 요구해요(앱이면 앱 ID).
+  // 앱은 app/capacitor.config.json 의 server.hostname 을 앱 ID 로 두어서, 앱 화면의 주소가 https://<앱 ID>/ 가 돼요.
+  // 앱 안에서 재생이 막힌 기기(유튜브가 오류를 알려준 경우)는 기억해 두었다가 다음부터 곧바로 유튜브로 열어요.
+  const WIDGET_ORIGINS = ['https://www.youtube-nocookie.com', 'https://www.youtube.com'];
+
+  function inlineAllowed() {
+    if (!NATIVE) return true;
+    return !!(CFG.media && CFG.media.inlineInApp === true) && store.get('yt.inlineBroken', false) !== true;
+  }
+
+  function embedUrl(id) {
+    const q = ['autoplay=1', 'rel=0', 'playsinline=1', 'enablejsapi=1'];
+    if (NATIVE) q.push('fs=0'); // 앱 화면은 전체 화면 전환을 지원하지 않아서 그 버튼을 숨겨요
+    if (/^https?:\/\//.test(location.origin)) q.push('origin=' + encodeURIComponent(location.origin));
+    return `https://www.youtube-nocookie.com/embed/${id}?${q.join('&')}`;
+  }
+
+  /** 플레이어가 보내주는 오류 소식을 듣고, 화면이 숨겨지면 일시정지해요. 돌려주는 함수를 부르면 듣기를 멈춰요. */
+  function watchPlayer(iframe, onError) {
+    let alive = true;
+    let heard = false;
+    let tries = 0;
+    const send = (msg) => {
+      try {
+        iframe.contentWindow.postMessage(JSON.stringify(msg), '*');
+      } catch (e) {
+        /* 보낼 수 없으면 그냥 넘어가요 */
+      }
+    };
+    const stop = () => {
+      alive = false;
+      clearInterval(timer);
+      window.removeEventListener('message', onMessage);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+    const onMessage = (ev) => {
+      if (!alive) return;
+      if (!iframe.isConnected) return stop();
+      if (ev.source !== iframe.contentWindow || !WIDGET_ORIGINS.includes(ev.origin)) return;
+      heard = true;
+      let d = ev.data;
+      if (typeof d === 'string') {
+        try {
+          d = JSON.parse(d);
+        } catch (e) {
+          return;
+        }
+      }
+      if (d && d.event === 'onError') {
+        stop();
+        onError(Number(d.info));
+      }
+    };
+    const onVisibility = () => {
+      if (!alive) return;
+      if (!iframe.isConnected) return stop();
+      if (document.hidden) send({ event: 'command', func: 'pauseVideo', args: '' }); // 앱을 나가도 소리가 이어지지 않게
+    };
+    // 플레이어가 소식을 보내기 시작하게 '듣고 있어요' 신호를 보내요 (준비될 때까지 몇 번 반복)
+    const hello = () => {
+      if (heard || !alive || !iframe.isConnected || ++tries > 20) return clearInterval(timer);
+      send({ event: 'listening', id: 1, channel: 'widget' });
+    };
+    const timer = setInterval(hello, 500);
+    window.addEventListener('message', onMessage);
+    document.addEventListener('visibilitychange', onVisibility);
+    iframe.addEventListener('load', hello);
+    return stop;
+  }
+
   function mediaBlock(c) {
     const v = videoOf(c);
     if (!v) return artBlock(c);
     const watch = `https://www.youtube.com/watch?v=${v.id}`;
-    // 웹에서는 눌러서 그 자리에서 재생해요. 앱(안드로이드)에서는 유튜브로 열어요.
-    // (앱 안 재생은 기기마다 막힐 수 있어서, config.js 의 media.inlineInApp 을 true 로 바꿔 시험한 뒤에 켜요)
-    const inline = !NATIVE || !!(CFG.media && CFG.media.inlineInApp === true);
     const img = h('img', { alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
     const play = h(
       'a',
@@ -466,20 +534,32 @@
       img.remove();
       play.classList.add('nothumb');
     });
-    if (inline) {
+    if (inlineAllowed()) {
       play.addEventListener('click', (e) => {
         if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
+        const iframe = h('iframe', {
+          src: embedUrl(v.id),
+          title: v.title,
+          allow: NATIVE ? 'autoplay; encrypted-media; picture-in-picture' : 'autoplay; encrypted-media; picture-in-picture; fullscreen',
+          allowfullscreen: NATIVE ? null : true,
+          referrerpolicy: 'strict-origin-when-cross-origin'
+        });
         frame.textContent = '';
-        frame.appendChild(
-          h('iframe', {
-            src: `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&playsinline=1`,
-            title: v.title,
-            allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen',
-            allowfullscreen: true,
-            referrerpolicy: 'strict-origin-when-cross-origin'
-          })
-        );
+        frame.appendChild(iframe);
+        watchPlayer(iframe, (code) => {
+          // 2·5·153: 이 기기/환경에서 플레이어를 못 띄우는 경우예요. 100·101·150 은 그 영상만 막힌 경우라서 기억하지 않아요.
+          if (NATIVE && (code === 2 || code === 5 || code === 153)) store.set('yt.inlineBroken', true);
+          frame.textContent = '';
+          frame.appendChild(
+            h(
+              'div',
+              { class: 'vfail', role: 'status' },
+              h('p', null, '이 영상은 여기서 재생되지 않아요.'),
+              h('a', { class: 'btn primary', href: watch, target: '_blank', rel: 'noopener noreferrer' }, icon('play', 16), 'YouTube에서 보기')
+            )
+          );
+        });
       });
     }
     return h(
