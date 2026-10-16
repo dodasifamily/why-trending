@@ -11,6 +11,10 @@ on:
       - 'scripts/content.mjs'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
+  # 매일 한국 시간 06:30 (해설 갱신 40분 뒤)에 한 번 더 올려요. 갱신 때 올리기를 놓쳤거나,
+  # Pages 를 나중에 켠 경우에도 하루 안에 저절로 사이트가 올라가요.
+  schedule:
+    - cron: '30 21 * * *'
 
 permissions:
   contents: read
