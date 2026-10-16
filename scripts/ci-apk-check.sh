@@ -62,6 +62,10 @@ else
   fail=1
 fi
 
+# 시험용 앱을 폰에서 덮어 설치하려면 빌드마다 서명 키가 같아야 해요. 지문이 같은지 비교할 수 있게 적어 둬요.
+cert="$("$BT/apksigner" verify --print-certs "$APK" 2>/dev/null | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+report+=$'\n'"서명 인증서 지문(SHA-256): ${cert:-읽지 못함}"
+
 printf '%s\n' "$report"
 esc="$(printf '%s' "$report" | python3 -c 'import sys; t = sys.stdin.read(); print(t.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))')"
 if [ "$fail" -eq 0 ]; then

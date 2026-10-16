@@ -76,6 +76,14 @@ jobs:
         working-directory: app
         run: ../scripts/ci-run.sh "cap sync" -- npx cap sync android
 
+      # 시험용 서명 키(디버그 키)는 빌드 때마다 새로 만들어져서, 그대로 두면 폰에서 '덮어 설치'가 안 돼요.
+      # 키를 캐시에 두고 계속 같은 키를 써요. (비밀 키가 아니에요. 정식 출시용 키는 따로 GitHub Secrets 에만 둬요.)
+      - name: 시험용 서명 키 불러오기
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: debug-keystore-v1
+
       - name: 시험용 APK 만들기
         working-directory: app/android
         run: |
