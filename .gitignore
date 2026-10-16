@@ -7,6 +7,8 @@ local.properties
 .env.*
 *.pem
 *.p12
+google-services.json
+GoogleService-Info.plist
 
 # ── Node ──────────────────────────────────────────────────────
 node_modules/

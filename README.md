@@ -10,8 +10,8 @@
 | --- | --- |
 | `site/` | 화면(HTML·CSS·JS)과 매일 바뀌는 해설 데이터(`site/data/`). GitHub Pages로 올라가요. |
 | `app/` | 안드로이드 앱 껍데기(Capacitor) 설정. 빌드할 때 `site/`를 복사해 넣어요. |
-| `scripts/` | 해설 데이터 검사·합치기 도구(`content.mjs`), 아이콘 생성기 등 |
-| `.github/workflows/` | 자동 빌드(`android.yml`)와 사이트 배포(`pages.yml`) |
+| `scripts/` | 해설 데이터 검사·합치기 도구(`content.mjs`), 분야별 알림 보내기(`push.mjs`), 아이콘 생성기 등 |
+| `.github/workflows/` | 자동 빌드(`android.yml`), 사이트 배포(`pages.yml`), 분야별 알림 보내기(`push.yml`) |
 | `ops/` | 매일 해설을 갱신하는 담당이 읽는 지침(`daily-job.md`, `fallback-runner.md`). 사이트·앱에는 올라가지 않아요. |
 
 ## 해설 데이터 규칙
@@ -30,6 +30,16 @@
 - `site/data/recent.json`(최근 14일 해설, 분야마다 최대 7개)은 사전(`terms.json`)에서 **올릴 때마다 만들어지는 파일**이에요(`node scripts/content.mjs recent`, `pages.yml`·`android.yml` 이 실행). 저장소에는 올리지 않아요(`.gitignore`). 앱은 오늘 해설(`today.json`)과 이 파일을 합쳐 분야별 목록을 만들어요.
 - 후보 카드를 미리 검사하려면 `node scripts/content.mjs check <파일.json>`, 최근 14일 안의 지난 화제를 사전에만 더하려면 `node scripts/content.mjs add <파일.json>` 을 써요(자세한 규칙은 `ops/daily-job.md`).
 
+### 분야별 알림 (푸시)
+
+- 알림을 켜면 앱이 **고른 분야**(`cat_meme`, `cat_sports` …)와 **받는 시각**(`h7`·`h8`·`h9`)을 FCM 주제로 구독해요. 끄면 구독을 모두 풀고 이 기기의 알림 등록도 지워요(`deleteToken`). 알림을 켜기 전에는 기기 등록을 하지 않아요(매니페스트의 `firebase_messaging_auto_init_enabled=false`). 앱 쪽 코드는 `site/js/app.js` 의 `syncPush()`·`wantedTopics()` 예요.
+- 보내는 쪽은 `scripts/push.mjs`(`push.yml`)예요. 오늘 해설이 있는 분야마다 "그 분야 **그리고** 그 시각" 조건(`'cat_sports' in topics && 'h8' in topics`)으로 한 번씩 보내요. 오늘 해설이 아직 안 올라왔으면 최대 25분 기다리고, 그래도 없으면 보내지 않아요(지난 해설로 '새 해설' 알림을 보내지 않아요). 알림을 누르면 그 분야의 첫 해설(`#/t/<id>`)이 열려요.
+- **켜지는 조건**: GitHub Secrets 에 Firebase 설정이 있어야 해요. 없으면 앱은 지금처럼 기기 안 알림(매일 같은 글)만 쓰고, `push.yml` 은 아무것도 보내지 않고 끝나요.
+  - `GOOGLE_SERVICES_JSON`: Firebase 콘솔에서 안드로이드 앱(패키지 이름 `io.github.dodasifamily.issuewhy`)을 등록하고 받은 `google-services.json` 의 내용 전체. 앱을 만들 때(`android.yml` → `app/scripts/prepare-fcm.mjs`) 써요. 패키지 이름이 다르면 빌드가 이유를 알려 주며 멈춰요.
+  - `FCM_SERVICE_ACCOUNT_JSON`: Firebase 프로젝트 설정 → 서비스 계정 → '새 비공개 키 생성'으로 받은 JSON 의 내용 전체. 알림을 보낼 때(`push.yml`) 써요. **비밀 키예요.** 채팅·이슈·저장소에 올리지 말고 Secrets 에만 넣어요.
+- 직접 해 보기: Actions 탭 → '분야별 알림 보내기' → Run workflow. 처음에는 '보내지 않고 내용만 보기'를 `true` 로 두고 로그에서 보낼 내용을 확인해요.
+- 개인정보: 알림을 켜면 Google(Firebase Cloud Messaging)이 기기의 알림 등록 값·설치 ID·IP 등을 처리해요. 운영자는 이 값을 받지 않아요. 개인정보처리방침 6번에 적어 두었어요. 구글 플레이 '데이터 보안' 양식에는 '기기 또는 기타 ID'(앱 기능 목적, 알림을 켠 경우에만)를 적어야 해요. 양식을 쓸 때 구글 안내를 다시 확인해요.
+
 ### 사진·영상 (`media`)
 
 - 해설 화면 위쪽에 영상 미리보기가 나오고, 영상이 없는 해설에는 분야별 그림 카드가 나와요.
@@ -46,7 +56,8 @@
 | 해설 갱신 (예약 작업 '왜뜨지 매일 해설 갱신') | 매일 05:50 (한국 시간) | 오늘 화제를 찾아 기사로 확인하고 `site/data/` 의 두 파일(`today.json`, `terms.json`)만 고쳐 올려요 |
 | 해설 갱신 확인 (Claude 대화) | 매일 06:40 (한국 시간) | 예약 작업이 실제로 도는지 확인되지 않아서, 대화가 직접 확인하고 오늘 분량이 없으면 `ops/daily-job.md` 대로 올려요 (`ops/fallback-runner.md`) |
 | 사이트 올리기 (`pages.yml`) | `site/` 가 바뀔 때, 매일 06:30 | 해설 검사 → 최근 14일 목록(`recent.json`) 만들기 → GitHub Pages 에 웹 화면과 최신 해설을 올려요. 앱도 여기서 최신 해설을 받아가요 |
-| 앱 만들기 (`android.yml`) | 화면·앱 설정이 바뀔 때 (해설 데이터만 바뀔 때는 안 돌아요) | 시험용 APK 를 만들어 릴리스 `test-latest` 에 올려요. 서명 키를 등록하면 출시용 AAB 도 만들어요 |
+| 앱 만들기 (`android.yml`) | 화면·앱 설정이 바뀔 때 (해설 데이터만 바뀔 때는 안 돌아요) | 시험용 APK 를 만들어 릴리스 `test-latest` 에 올려요. 서명 키를 등록하면 출시용 AAB 도 만들어요. Firebase 설정을 등록해 두었다면 푸시 알림도 켜서 만들어요 |
+| 분야별 알림 보내기 (`push.yml`) | 매일 07:00·08:00·09:00 (한국 시간) | 오늘 해설이 있는 분야마다, 그 분야와 그 시각을 고른 기기에만 푸시 알림을 보내요. Firebase 키가 없으면 아무것도 안 하고 끝나요 |
 
 - 시험용 앱(폰에서 바로 설치): https://github.com/dodasifamily/why-trending/releases/download/test-latest/whyttuji-test.apk
 - 시험용 앱의 서명 키(디버그 키) 파일은 Actions 캐시(`debug-keystore-v2`)에 두고 계속 같은 키로 서명해요 (`app/scripts/patch-android.mjs` 가 Gradle 에 그 경로를 알려줘요). 그래서 새 시험용 앱을 폰에 **덮어 설치**할 수 있어요. 캐시가 7일 넘게 안 쓰여 지워지면 키가 바뀌어서, 그때는 한 번 앱을 지우고 다시 설치해야 해요. 이 키는 비밀 키가 아니고 출시에는 쓰지 않아요 (출시용 키는 GitHub Secrets 에만 둬요).
@@ -58,4 +69,4 @@
 
 ## 비밀 정보
 
-비밀번호·서명 키·API 키는 이 저장소에 올리지 않아요 (`.gitignore`로 막아 두었어요). 필요한 값은 GitHub Secrets에만 넣어요.
+비밀번호·서명 키·API 키는 이 저장소에 올리지 않아요 (`.gitignore`로 막아 두었어요. `google-services.json` 도 포함해요). 필요한 값은 GitHub Secrets에만 넣어요: 출시용 서명(`KEYSTORE_BASE64` 등), Firebase(`GOOGLE_SERVICES_JSON`, `FCM_SERVICE_ACCOUNT_JSON`).

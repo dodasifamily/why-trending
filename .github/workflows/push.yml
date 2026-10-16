@@ -1,0 +1,54 @@
+name: 분야별 알림 보내기 (FCM)
+
+# 매일 아침 7시·8시·9시(한국 시간)에, '그 분야를 고르고 그 시각을 고른 기기'에만 알림을 보내요.
+#  - 오늘 해설이 올라오지 않았으면 보내지 않아요 (지난 해설로 '새 해설' 알림을 보내지 않아요).
+#  - Firebase 서비스 계정 키(FCM_SERVICE_ACCOUNT_JSON)가 GitHub Secrets 에 등록되기 전에는 아무것도 하지 않고 끝나요.
+#  - 직접 해 보려면 Actions 탭에서 '알림 보내기'를 눌러요 (받는 시각을 고르고, 처음에는 '보내지 않고 내용만 보기' 로 확인해요).
+# 보내는 방법과 규칙은 scripts/push.mjs 에 있어요.
+
+on:
+  schedule:
+    - cron: '0 22 * * *'   # 한국 시간 07:00
+    - cron: '0 23 * * *'   # 한국 시간 08:00
+    - cron: '0 0 * * *'    # 한국 시간 09:00
+  workflow_dispatch:
+    inputs:
+      hour:
+        description: '받는 시각 (7, 8, 9 중 하나)'
+        required: true
+        default: '8'
+      dry_run:
+        description: '보내지 않고 내용만 보기 (true 또는 false)'
+        required: true
+        default: 'true'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: push-${{ github.event.schedule || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  send:
+    # 이 저장소에서만 보내요 (복제본이 실수로 보내지 않게)
+    if: github.repository == 'dodasifamily/why-trending'
+    name: 알림 보내기
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 알림 보내기
+        env:
+          FCM_SERVICE_ACCOUNT_JSON: ${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}
+          # 예약 실행은 어느 시각 알림인지 예약 시각으로 정해요 (07:00 → 7, 08:00 → 8, 09:00 → 9)
+          HOUR: ${{ github.event_name == 'workflow_dispatch' && inputs.hour || github.event.schedule == '0 22 * * *' && '7' || github.event.schedule == '0 23 * * *' && '8' || '9' }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+          # 예약 실행은 해설 갱신이 조금 늦어도 기다려요 (최대 25분). 직접 누른 실행은 기다리지 않아요.
+          WAIT_MIN: ${{ github.event_name == 'workflow_dispatch' && '0' || '25' }}
+        run: node scripts/push.mjs

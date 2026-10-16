@@ -50,6 +50,7 @@
     alertOn: store.get('alertOn', false) === true,
     hour: HOURS.includes(store.get('hour', 8)) ? store.get('hour', 8) : 8,
     alertMsg: '',
+    alertBusy: 0, // 푸시 구독을 맞추는 중인 작업 수 (인터넷이 느릴 때 '설정하는 중' 표시용)
     reported: store.get('reported', {}),
     reportState: {},
     lastLoad: 0
@@ -311,7 +312,8 @@
     onCatsChanged();
   }
   function onCatsChanged() {
-    /* 분야별 맞춤 알림(2단계)을 붙일 때 여기서 알림 구독을 바꿔요 */
+    // 고른 분야가 바뀌면 푸시 알림 구독도 맞춰요 (푸시를 쓰는 앱이고 알림이 켜져 있을 때만)
+    if (S.alertOn && fcm()) syncPush().catch(() => {});
   }
   /** '드라마·영화·웹툰' 처럼 가운뎃점이 든 이름은 점 뒤에서만 줄이 바뀌게 해요 */
   function labelNodes(label) {
@@ -1002,25 +1004,164 @@
     store.set('hour', S.hour);
   }
 
-  /** 매일 정한 시각에 알림을 다시 예약해요 (앱에서만) */
+  // ---------- 푸시 알림 (Firebase, 안드로이드 앱에서만) ----------
+  // Firebase 설정이 들어간 앱에서만 켜져요. 아니면 fcm() 이 null 이라서 알림은 예전처럼 기기 안 예약(매일 같은 글)만 써요.
+  // 알림을 켜면 '고른 분야'(cat_<분야>)와 '받는 시각'(h<시각>)을 FCM 주제로 구독해요.
+  // 서버(scripts/push.mjs)는 오늘 해설이 있는 분야마다 "cat_<분야> 그리고 h<시각>" 조건으로 한 번씩 보내서,
+  // 고른 분야·고른 시각의 기기에만 도착해요. 알림을 끄면 구독을 모두 풀고 이 기기의 등록도 지워요.
+  const PUSH_TIMEOUT = 15000;
+  const TOPIC_RE = /^[a-z0-9_]{1,30}$/;
+
+  function fcm() {
+    if (!NATIVE || !Cap || typeof Cap.isPluginAvailable !== 'function') return null;
+    try {
+      return Cap.isPluginAvailable('FirebaseMessaging') ? plugin('FirebaseMessaging') : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /** 지금 구독하고 있어야 하는 주제들 (알림이 꺼져 있거나 분야를 안 골랐으면 없어요) */
+  function wantedTopics() {
+    if (!S.alertOn) return [];
+    const cats = (S.cats || []).filter((id) => TOPIC_RE.test(id)).map((id) => 'cat_' + id);
+    return cats.length ? cats.concat('h' + S.hour) : [];
+  }
+
+  function withTimeout(promise, ms) {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('timeout')), ms);
+      Promise.resolve(promise).then(
+        (v) => {
+          clearTimeout(timer);
+          resolve(v);
+        },
+        (e) => {
+          clearTimeout(timer);
+          reject(e);
+        }
+      );
+    });
+  }
+
+  let pushRun = null; // 진행 중인 맞추기
+  let pushAgain = false; // 맞추는 동안 또 바뀌었는지
+  /** 이 기기의 구독을 '지금 원하는 주제'에 맞춰요. 몇 번을 불러도 안전하고, 바뀐 것만 보내요. */
+  function syncPush() {
+    if (pushRun) {
+      pushAgain = true;
+      return pushRun;
+    }
+    pushRun = (async () => {
+      try {
+        do {
+          pushAgain = false;
+          await syncPushOnce();
+        } while (pushAgain);
+      } finally {
+        pushRun = null;
+      }
+    })();
+    return pushRun;
+  }
+
+  async function syncPushOnce() {
+    const FM = fcm();
+    if (!FM) return;
+    const want = wantedTopics();
+    const have = (store.get('subs', []) || []).filter((t) => typeof t === 'string');
+    const registered = store.get('fcmOn', false) === true;
+    if (want.length) {
+      if (!registered) {
+        await withTimeout(FM.getToken(), PUSH_TIMEOUT); // 알림을 켠 뒤에야 이 기기를 등록해요
+        store.set('fcmOn', true);
+      }
+      for (const t of want) {
+        if (have.includes(t)) continue;
+        await withTimeout(FM.subscribeToTopic({ topic: t }), PUSH_TIMEOUT);
+        have.push(t);
+        store.set('subs', have);
+      }
+      for (const t of have.slice()) {
+        if (want.includes(t)) continue;
+        await withTimeout(FM.unsubscribeFromTopic({ topic: t }), PUSH_TIMEOUT);
+        have.splice(have.indexOf(t), 1);
+        store.set('subs', have);
+      }
+    } else if (registered || have.length) {
+      for (const t of have.slice()) {
+        await withTimeout(FM.unsubscribeFromTopic({ topic: t }), PUSH_TIMEOUT);
+        have.splice(have.indexOf(t), 1);
+        store.set('subs', have);
+      }
+      try {
+        await withTimeout(FM.deleteToken(), PUSH_TIMEOUT);
+      } catch (e) {
+        /* 이미 지워졌으면 넘어가요 */
+      }
+      store.set('fcmOn', false);
+    }
+  }
+
+  /** 알림 설정을 바꿀 때 불러요. 푸시를 쓰는 앱에서는 서버에 구독을 맞추는 동안 '설정하는 중' 을 보여줘요. */
+  async function runAlert() {
+    if (!fcm()) {
+      await applyAlert();
+      return;
+    }
+    S.alertBusy++;
+    if (parseRoute().name === 'alerts') renderAlerts();
+    try {
+      await applyAlert();
+    } finally {
+      S.alertBusy--;
+    }
+  }
+
+  /** 알림을 눌러 앱이 열리면 그 해설로 가요 */
+  function initPushTap() {
+    const FM = fcm();
+    if (!FM || typeof FM.addListener !== 'function') return;
+    FM.addListener('notificationActionPerformed', (ev) => {
+      const data = ev && ev.notification && ev.notification.data;
+      const r = data && typeof data.route === 'string' ? data.route : '';
+      go(/^\/t\/[A-Za-z0-9._~%-]{1,90}$/.test(r) ? r : '/');
+    });
+  }
+
+  /** 알림을 다시 맞춰요: 푸시를 쓰는 앱이면 구독을, 아니면 매일 정한 시각의 기기 안 알림 예약을 (앱에서만) */
   async function applyAlert() {
     const LN = plugin('LocalNotifications');
     if (!LN) return;
     const ID = 1001;
+    const FM = fcm();
     try {
-      await LN.cancel({ notifications: [{ id: ID }] });
-      if (!S.alertOn) return;
+      await LN.cancel({ notifications: [{ id: ID }] }); // 푸시를 쓸 때도 예전 예약은 지워서 알림이 겹치지 않게 해요
+      if (!S.alertOn) {
+        if (FM) await syncPush().catch(() => {}); // 인터넷이 없어 구독을 못 풀면 다음에 앱을 열 때 다시 시도해요
+        return;
+      }
       const perm = await LN.requestPermissions();
       if (!perm || perm.display !== 'granted') {
         S.alertOn = false;
         S.alertMsg = '알림 권한을 허용해야 받을 수 있어요. 휴대폰 설정에서 허용해 주세요.';
         saveAlert();
+        if (FM) await syncPush().catch(() => {});
         return;
       }
       try {
         await LN.createChannel({ id: 'daily', name: '아침 알림', description: '매일 아침 오늘의 해설을 알려드려요', importance: 3, visibility: 1 });
       } catch (e) {
         /* 채널이 이미 있으면 넘어가요 */
+      }
+      if (FM) {
+        try {
+          await syncPush();
+          S.alertMsg = '';
+        } catch (e) {
+          S.alertMsg = '알림 설정을 저장하지 못했어요. 인터넷에 연결된 뒤 앱을 다시 열면 자동으로 다시 시도해요.';
+        }
+        return;
       }
       await LN.schedule({
         notifications: [
@@ -1042,6 +1183,7 @@
   function renderAlerts() {
     document.title = '알림 – 왜뜨지?';
     const canNotify = !!plugin('LocalNotifications');
+    const push = !!fcm();
 
     const sw = h('span', { class: S.alertOn ? 'sw on' : 'sw' }, h('span', { class: 'knob' }));
     const toggle = h(
@@ -1060,11 +1202,11 @@
           S.alertOn = !S.alertOn;
           S.alertMsg = '';
           saveAlert();
-          await applyAlert();
+          await runAlert();
           renderAlerts();
         }
       },
-      h('span', { style: 'display:block' }, h('span', { class: 'l1' }, '아침 알림'), h('span', { class: 'l2' }, '오늘 뜨는 말이 준비되면 알려드려요')),
+      h('span', { style: 'display:block' }, h('span', { class: 'l1' }, '아침 알림'), h('span', { class: 'l2' }, push ? '내 분야에 새 해설이 올라오면 알려드려요' : '오늘 뜨는 말이 준비되면 알려드려요')),
       sw
     );
 
@@ -1079,7 +1221,7 @@
           onclick: async () => {
             S.hour = hr;
             saveAlert();
-            if (S.alertOn) await applyAlert();
+            if (S.alertOn) await runAlert();
             renderAlerts();
           }
         },
@@ -1097,15 +1239,15 @@
     setView(
       [
         h('h1', { class: 'h2big' }, '알림'),
-        h('p', { class: 'sub' }, '매일 아침 오늘의 해설이 나왔다고 알려드려요'),
-        h('div', { class: 'panel' }, toggle, h('div', { class: 'label' }, '받는 시간'), h('div', { class: 'chips' }, hourChips), S.alertMsg && h('div', { class: 'status warn', role: 'status', style: 'margin-top:14px' }, S.alertMsg)),
+        h('p', { class: 'sub' }, push ? '고른 분야의 새 해설이 나온 날 아침에 알려드려요' : '매일 아침 오늘의 해설이 나왔다고 알려드려요'),
+        h('div', { class: 'panel' }, toggle, h('div', { class: 'label' }, '받는 시간'), h('div', { class: 'chips' }, hourChips), S.alertBusy > 0 && h('div', { class: 'status', role: 'status', style: 'margin-top:14px' }, '알림을 설정하는 중이에요…'), S.alertBusy === 0 && S.alertMsg && h('div', { class: 'status warn', role: 'status', style: 'margin-top:14px' }, S.alertMsg)),
         h(
           'div',
           { class: 'panel' },
           h('div', { class: 'ptitle' }, '내 분야'),
           myPills.length ? h('div', { class: 'mypills', style: 'margin-top:12px' }, myPills) : h('p', { class: 'sub', style: 'margin:8px 0 0' }, S.groups ? '아직 고르지 않았어요.' : '분야 목록을 불러오지 못했어요.'),
           S.groups ? h('button', { class: 'btn ghost', type: 'button', style: 'margin-top:14px', onclick: () => go('/pick') }, '분야 바꾸기') : null,
-          h('div', { class: 'info' }, icon('info', 16), h('span', null, '고른 분야의 이슈만 오늘 화면에 보여요. 정치, 사건사고, 실명 의혹은 다루지 않아요.'))
+          h('div', { class: 'info' }, icon('info', 16), h('span', null, push ? '고른 분야의 이슈만 보여주고 알려드려요. 새 해설이 없는 분야는 알림이 오지 않아요. 정치, 사건사고, 실명 의혹은 다루지 않아요.' : '고른 분야의 이슈만 오늘 화면에 보여요. 정치, 사건사고, 실명 의혹은 다루지 않아요.'))
         ),
         h('div', { class: 'info' }, icon('info', 16), h('span', null, AI_NOTE)),
         h('p', { class: 'legal' }, h('a', { href: 'privacy.html' }, '개인정보처리방침'))
@@ -1152,7 +1294,10 @@
       });
     }
     initAds();
-    if (S.alertOn) applyAlert(); // 시간대·재부팅 뒤에도 예약이 살아 있게 다시 걸어 둬요
+    initPushTap();
+    // 시간대·재부팅 뒤에도 예약이 살아 있게 다시 걸어 둬요. 알림이 꺼져 있어도, 못 풀었던 푸시 구독이 남아 있으면 마저 풀어요.
+    if (S.alertOn) applyAlert();
+    else if (fcm()) syncPush().catch(() => {});
   }
 
   // ---------- 시작 ----------

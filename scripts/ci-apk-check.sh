@@ -30,6 +30,24 @@ check 'com.google.android.gms.ads.APPLICATION_ID' 'AdMob 앱 ID (없으면 앱�
 check 'android.permission.INTERNET' '인터넷 권한'
 check 'android.permission.POST_NOTIFICATIONS' '알림 권한'
 
+# 푸시 알림(FCM)은 Firebase 설정이 들어간 빌드에서만 켜져요 (workflow 가 FCM_ENABLED 로 알려줘요).
+if [ "${FCM_ENABLED:-false}" = "true" ]; then
+  check 'com.google.firebase.MESSAGING_EVENT' '푸시 알림(FCM) 받는 서비스'
+  check 'com.google.firebase.messaging.default_notification_channel_id' '푸시 알림 기본 채널'
+  check 'firebase_messaging_auto_init_enabled' '푸시 기기 등록은 알림을 켠 뒤에만 (자동 등록 끔)'
+  if "$BT/aapt2" dump resources "$APK" 2>/dev/null | grep -q 'string/google_app_id'; then
+    report+=$'\n'"✅ Firebase 앱 ID(google_app_id)가 들어갔어요"
+  else
+    report+=$'\n'"❌ Firebase 앱 ID(google_app_id)가 없어요 — google-services 부품이 적용되지 않았을 수 있어요"
+    fail=1
+  fi
+elif grep -q 'com.google.firebase.MESSAGING_EVENT' "$WORK/manifest.txt"; then
+  report+=$'\n'"❌ 푸시 알림은 꺼져 있어야 하는데 FCM 받는 서비스가 들어 있어요"
+  fail=1
+else
+  report+=$'\n'"ℹ️ 푸시 알림(FCM): 꺼짐 (Firebase 설정을 등록하기 전이라 기기 안 알림만 써요)"
+fi
+
 # 구글 플레이는 새 앱·업데이트에 목표 SDK 36 이상을 요구해요.
 target="$(sed -n "s/^targetSdkVersion:'\([0-9]*\)'.*/\1/p" "$WORK/badging.txt" | head -n 1)"
 if [ -n "$target" ] && [ "$target" -ge 36 ]; then
