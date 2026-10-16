@@ -9,7 +9,7 @@
 //
 // 옵션: --site <폴더>   기본값은 site
 //
-// 규칙의 목적: 출처 없는 내용, 민감한 주제, 너무 긴 글, 출처가 불분명한 영상이 앱에 올라가지 않게 막는 안전장치예요.
+// 규칙의 목적: 출처 없는 내용, 민감한 주제, 너무 긴 글, 출처가 불분명한 영상, 며칠 전·지난달 기사에 기댄 '오늘 소식'이 앱에 올라가지 않게 막는 안전장치예요.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -36,9 +36,19 @@ const MAX_PER_GROUP_PER_DAY = 4; // 한 분야가 하루 카드를 독차지하�
 const RECENT_DAYS = 14; // 앱 분야별 목록에 쓰는 지난 해설 기간 (오늘 포함 14일)
 const FEED_MAX_PER_GROUP = 7; // 앱이 분야마다 보여주는 최대 개수 (recent.json 도 분야마다 이만큼만 담아요)
 const FEED_MIN_PER_GROUP = 5; // 분야마다 최근 RECENT_DAYS 일 안에 이만큼은 있어야 해요 (모자라면 validate 가 알려줘요)
-// '오늘 뜨는 말'인데 몇 달 전 기사만 있으면 지금 뜨는 게 아닐 수 있어요.
-// 카드 날짜 기준, 가장 최근 출처가 이 일수 안에 있어야 오늘의 카드로 올릴 수 있어요. (사전 항목에는 적용하지 않아요)
-const MAX_SOURCE_AGE_DAYS = 45;
+// '오늘 뜨는' 소식이 며칠 전·지난달 기사에 기대지 않게 해요. 아래 일수는 모두 카드 날짜(date) 기준이에요.
+//  - 모든 출처가 MAX_SOURCE_AGE_DAYS 일 안에 나온 기사여야 해요.
+//  - 가장 최근 출처는 NEWEST_SOURCE_MAX_DAYS 일 안(카드 날짜 당일~전날)에 나온 기사여야 해요.
+//  - FRESH_SOURCE_DAYS 일 안에 나온 기사가 서로 다른 매체 MIN_FRESH_OUTLETS 곳 이상이어야 해요.
+// 유행어·밈(meme 분야)은 기사가 드문드문 올라와서 기준을 조금 넓혀요 (MEME_*).
+// 오늘 카드와 `check`/`add` 후보에는 이 기준이 에러로 적용돼요. 사전(terms.json)에 이미 있는 카드는 지우지 않지만,
+// 이 기준을 못 넘으면 앱의 '최근 2주' 목록(recent.json)에서는 빠져요 (사전 화면에는 그대로 있어요).
+const MAX_SOURCE_AGE_DAYS = 14;
+const NEWEST_SOURCE_MAX_DAYS = 1;
+const FRESH_SOURCE_DAYS = 3;
+const MEME_NEWEST_SOURCE_MAX_DAYS = 3;
+const MEME_FRESH_SOURCE_DAYS = 7;
+const MIN_FRESH_OUTLETS = 2;
 
 // 해설 화면에 붙이는 영상 규칙.
 // 저작권 때문에 기사 사진은 가져다 쓰지 않아요. 대신 '출처로 단 기사 페이지에 매체가 직접 실어 둔 유튜브 영상'만
@@ -246,15 +256,34 @@ function daysBetween(a, b) {
   return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
 }
 
-// 오늘의 카드: 가장 최근 출처가 너무 오래됐으면 올리지 않아요.
+// 카드 날짜 기준으로 출처가 충분히 최근인지 봐요. 문제가 없으면 빈 목록, 있으면 이유 글자들을 돌려줘요.
+function freshnessProblems(card) {
+  if (!card || typeof card !== 'object' || !isRealDate(card.date) || !Array.isArray(card.sources)) return [];
+  const items = card.sources
+    .filter((s) => s && typeof s === 'object' && isRealDate(s.published))
+    .map((s) => ({ name: String(s.name || '').trim(), published: s.published, age: daysBetween(s.published, card.date) }));
+  if (!items.length) return [];
+  const meme = card.group === 'meme';
+  const newestMax = meme ? MEME_NEWEST_SOURCE_MAX_DAYS : NEWEST_SOURCE_MAX_DAYS;
+  const freshDays = meme ? MEME_FRESH_SOURCE_DAYS : FRESH_SOURCE_DAYS;
+  const out = [];
+  const newest = items.reduce((a, b) => (b.age < a.age ? b : a));
+  if (newest.age > newestMax) {
+    out.push(`가장 최근 출처(${newest.published})가 카드 날짜보다 ${newest.age}일 전이에요 (${newestMax}일 안이어야 해요)`);
+  }
+  const stale = items.filter((x) => x.age > MAX_SOURCE_AGE_DAYS);
+  if (stale.length) out.push(`${MAX_SOURCE_AGE_DAYS}일보다 오래된 출처가 있어요: ${stale.map((x) => `${x.name} ${x.published}`).join(', ')}`);
+  const fresh = new Set(items.filter((x) => x.age <= freshDays).map((x) => x.name));
+  if (fresh.size < MIN_FRESH_OUTLETS) {
+    out.push(`카드 날짜 ${freshDays}일 안에 나온 기사가 서로 다른 매체 ${MIN_FRESH_OUTLETS}곳 이상 있어야 해요 (지금 ${fresh.size}곳)`);
+  }
+  return out;
+}
+
+// 오늘의 카드(와 add 후보): 출처가 오래됐으면 올리지 않아요.
 function checkFreshness(card, where) {
-  if (!isRealDate(card.date) || !Array.isArray(card.sources)) return;
-  const dates = card.sources.map((s) => s && s.published).filter(isRealDate);
-  if (!dates.length) return;
-  const newest = dates.sort().at(-1);
-  const age = daysBetween(newest, card.date);
-  if (age > MAX_SOURCE_AGE_DAYS) {
-    err(where, `가장 최근 출처(${newest})가 카드 날짜보다 ${age}일 전이에요. 오늘의 카드는 ${MAX_SOURCE_AGE_DAYS}일 안의 출처가 있어야 해요 (사전에만 넣을 수는 있어요)`);
+  for (const p of freshnessProblems(card)) {
+    err(where, `${p} — 오늘 뜨는 소식은 최근 기사에 기대야 해요. 며칠 전·지난달 기사로는 올리지 않아요`);
   }
 }
 
@@ -342,7 +371,14 @@ function validate() {
   if (isRealDate(today.date)) {
     const from = shiftDate(today.date, -(RECENT_DAYS - 1));
     const count = {};
-    for (const c of terms.terms) if (c.date >= from && c.date <= today.date) count[c.group] = (count[c.group] || 0) + 1;
+    const inWindow = terms.terms.filter((c) => c.date >= from && c.date <= today.date);
+    const stale = inWindow.filter((c) => freshnessProblems(c).length);
+    // 출처가 오래된 해설은 앱의 '최근 2주' 목록(recent.json)에서 빠지니까 개수에도 넣지 않아요
+    for (const c of inWindow) if (!stale.includes(c)) count[c.group] = (count[c.group] || 0) + 1;
+    if (stale.length) {
+      console.log(`⚠️ 최근 ${RECENT_DAYS}일 안이지만 출처가 오래돼 앱 목록에서 빠지는 해설 ${stale.length}개 (사전에는 남아요):`);
+      for (const c of stale) console.log(`   - ${c.id} (${c.date}): ${freshnessProblems(c)[0]}`);
+    }
     const low = cats.groups.filter((g) => (count[g.id] || 0) < FEED_MIN_PER_GROUP);
     if (low.length) {
       console.log(`⚠️ 최근 ${RECENT_DAYS}일 해설이 ${FEED_MIN_PER_GROUP}개 미만인 분야: ${low.map((g) => `${g.label}(${g.id}) ${count[g.id] || 0}개`).join(', ')} — 오늘 카드에서 이 분야부터 채워 주세요`);
@@ -381,10 +417,15 @@ function recent() {
   const byId = new Map();
   for (const c of [...(Array.isArray(terms.terms) ? terms.terms : []), ...today.cards]) byId.set(c.id, c);
   const from = shiftDate(today.date, -(RECENT_DAYS - 1));
-  const inWindow = [...byId.values()]
+  const inRange = [...byId.values()]
     .map((c, idx) => ({ c, idx }))
     .filter((x) => x.c.date >= from && x.c.date <= today.date)
     .sort((a, b) => (a.c.date < b.c.date ? 1 : a.c.date > b.c.date ? -1 : a.idx - b.idx));
+  // 며칠 전·지난달 기사에 기댄 해설은 '최근 2주' 목록에 올리지 않아요 (사전에는 그대로 있어요)
+  const inWindow = inRange.filter((x) => freshnessProblems(x.c).length === 0);
+  if (inWindow.length < inRange.length) {
+    console.log(`ℹ️ 출처가 오래돼 최근 목록에서 뺀 해설 ${inRange.length - inWindow.length}개: ${inRange.filter((x) => !inWindow.includes(x)).map((x) => x.c.id).join(', ')}`);
+  }
   const perGroup = {};
   const cards = inWindow
     .filter((x) => {
