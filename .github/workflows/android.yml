@@ -49,8 +49,8 @@ jobs:
       - name: 콘텐츠 검사
         run: node scripts/content.mjs validate
 
-      # 앱에 같이 넣는 사본에도 '지난 며칠' 목록이 있어야 인터넷이 없을 때도 보여요
-      - name: 최근 7일 해설 목록 만들기
+      # 앱에 같이 넣는 사본에도 최근 14일 해설 목록이 있어야 인터넷이 없을 때도 분야별 목록이 보여요
+      - name: 최근 14일 해설 목록 만들기
         run: node scripts/content.mjs recent
 
       - name: 웹 화면을 앱 폴더로 복사
@@ -121,18 +121,11 @@ jobs:
       # 폰에서 링크 하나로 내려받아 설치해 볼 수 있게 해요. (로그인 없이 받을 수 있어요)
       # 주소: https://github.com/<저장소>/releases/download/test-latest/whyttuji-test.apk
       - name: 시험용 APK 를 내려받기 쉽게 올리기
+        # 실패해도 빌드 전체를 실패로 만들지는 않지만, 원인이 '오류 알림'으로 남아요 (scripts/ci-release.sh)
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          APK="$(ls app/android/app/build/outputs/apk/debug/*.apk | head -n 1)"
-          cp "$APK" whyttuji-test.apk
-          gh release delete test-latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create test-latest whyttuji-test.apk \
-            --title "왜뜨지 시험용 앱 (최신)" \
-            --notes "폰에 바로 설치해 써볼 수 있는 시험용 앱이에요. 광고는 구글 테스트 광고만 나와요. 정식 출시용이 아니에요. (빌드 ${{ github.run_number }}, 커밋 ${GITHUB_SHA::7})" \
-            --prerelease --target "$GITHUB_SHA"
+        run: bash scripts/ci-run.sh "시험용 앱 링크 올리기" -- bash scripts/ci-release.sh
 
       - name: 서명 정보가 등록돼 있는지 확인
         id: ks
