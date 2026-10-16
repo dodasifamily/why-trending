@@ -10,6 +10,9 @@
 //   WAIT_MIN  오늘 해설이 올라오길 기다리는 최대 분. 기본 0.
 //   PUSH_FILE 시험 보내기 파일 경로(ops/push-now.json). 이 파일이 있으면 HOUR·DRY_RUN·WAIT_MIN 대신 파일 내용대로 해요.
 //             {"hours":[8], "dry_run": false} — dry_run 을 false 로 분명히 적었을 때만 진짜로 보내요.
+//             {"hours":[8], "dry_run": false, "validate_only": true} — FCM 에 '검사만' 부탁해요. 기기에는 아무것도 가지 않고,
+//             키·프로젝트·FCM 설정이 맞는지만 확인돼요.
+//   GOOGLE_SERVICES_JSON  (선택) 앱에 넣은 Firebase 설정. 있으면 서비스 계정 키와 같은 프로젝트인지 확인해요.
 //
 // 하는 일
 //   1) 오늘(한국 시간) 해설이 main 에 올라올 때까지 기다려요 (git fetch 로 origin/main 의 today.json 을 봐요)
@@ -84,8 +87,9 @@ export function buildMessages({ today, groups, hour, date }) {
 }
 
 /** FCM HTTP v1 요청 본문 */
-export function toFcmBody(m) {
+export function toFcmBody(m, { validateOnly = false } = {}) {
   return {
+    ...(validateOnly ? { validate_only: true } : {}),
     message: {
       condition: m.condition,
       notification: { title: m.title, body: m.body },
@@ -114,6 +118,16 @@ export function parseServiceAccount(raw) {
   if (!/^[a-z][a-z0-9-]{4,29}$/.test(sa.project_id)) throw new Error('서비스 계정 키의 project_id 모양이 이상해요.');
   if (!/BEGIN (RSA )?PRIVATE KEY/.test(sa.private_key)) throw new Error('서비스 계정 키의 private_key 모양이 이상해요.');
   return sa;
+}
+
+/** 앱에 넣은 Firebase 설정(google-services.json)의 프로젝트 ID. 읽지 못하면 null (확인을 건너뛰어요) */
+export function appProjectId(raw) {
+  try {
+    const id = JSON.parse(raw).project_info.project_id;
+    return typeof id === 'string' && id ? id : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 const b64url = (v) => Buffer.from(v).toString('base64url');
@@ -231,6 +245,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   let hours = [Number(args.hour ?? env.HOUR ?? 8)];
   let dry = args.dryRun || env.DRY_RUN === '1' || String(env.DRY_RUN).toLowerCase() === 'true';
   let waitMin = Math.max(0, Number(args.wait ?? env.WAIT_MIN ?? 0) || 0);
+  let validateOnly = false;
 
   // 시험 보내기: ops/push-now.json 이 바뀐 커밋이 main 에 올라오면 push.yml 이 파일에 적힌 대로 보내요.
   if (env.PUSH_FILE) {
@@ -243,6 +258,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     }
     hours = (Array.isArray(cfg && cfg.hours) ? cfg.hours : [cfg && cfg.hour !== undefined ? cfg.hour : 8]).map(Number);
     dry = !(cfg && cfg.dry_run === false); // false 라고 분명히 적었을 때만 진짜로 보내요
+    validateOnly = !!(cfg && cfg.validate_only === true); // true 라고 분명히 적었을 때만 '검사만' 해요
     waitMin = 0;
   }
   hours = [...new Set(hours)];
@@ -264,6 +280,14 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   } else if (!dry) {
     notice('알림 보내기를 건너뛰었어요', 'FCM_SERVICE_ACCOUNT_JSON 이 아직 등록되지 않았어요. Firebase 설정을 마치고 GitHub 의 Secrets 에 등록하면 그때부터 보내요.');
     return 0;
+  }
+  // 앱에 넣은 Firebase 프로젝트와 알림을 보내는 프로젝트가 다르면 알림이 기기에 닿지 않아요
+  const appProject = env.GOOGLE_SERVICES_JSON ? appProjectId(env.GOOGLE_SERVICES_JSON) : null;
+  if (sa && appProject && appProject !== sa.project_id) {
+    const msg = `앱에 넣은 Firebase 프로젝트(${appProject})와 서비스 계정 키의 프로젝트(${sa.project_id})가 달라요. 두 값을 같은 Firebase 프로젝트에서 받았는지 확인해 주세요.`;
+    console.error(`❌ ${msg}`);
+    failure('Firebase 프로젝트가 서로 달라요', msg);
+    return 1;
   }
 
   const date = kstDate(now());
@@ -314,9 +338,9 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     let failedHere = 0;
     for (const m of messages) {
       try {
-        const name = await sendOne({ accessToken, projectId: sa.project_id, body: toFcmBody(m), fetchImpl, wait });
+        const name = await sendOne({ accessToken, projectId: sa.project_id, body: toFcmBody(m, { validateOnly }), fetchImpl, wait });
         sent.push(m.group);
-        console.log(`✅ [${m.group}] 보냈어요 (${name.split('/').pop()})`);
+        console.log(validateOnly ? `✅ [${m.group}] 검사 통과 (기기에는 보내지 않았어요)` : `✅ [${m.group}] 보냈어요 (${name.split('/').pop()})`);
       } catch (e) {
         failedHere++;
         console.error(`❌ [${m.group}] 못 보냈어요: ${e.message}`);
@@ -324,7 +348,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
       }
     }
     failed += failedHere;
-    notice('분야별 알림', `${date} ${hour}시: ${sent.length}곳 보냄 (${sent.join(', ') || '없음'})${failedHere ? `, ${failedHere}곳 실패` : ''}`);
+    notice(validateOnly ? '분야별 알림 (검사만)' : '분야별 알림', `${date} ${hour}시: ${sent.length}곳 ${validateOnly ? '검사 통과, 기기에는 보내지 않았어요' : '보냄'} (${sent.join(', ') || '없음'})${failedHere ? `, ${failedHere}곳 실패` : ''}`);
   }
   return failed ? 1 : 0;
 }

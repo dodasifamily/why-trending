@@ -61,6 +61,7 @@
 | 분야별 알림 보내기 (`push.yml`) | 매일 07:07·08:07·09:07 (한국 시간) | 오늘 해설이 있는 분야마다, 그 분야와 그 시각을 고른 기기에만 푸시 알림을 보내요. Firebase 키가 없으면 아무것도 안 하고 끝나요 |
 
 - 시험용 앱(폰에서 바로 설치): https://github.com/dodasifamily/why-trending/releases/download/test-latest/whyttuji-test.apk
+  - 새 빌드가 끝나면 이미 있는 공개 릴리스를 **지우지 않고** 파일과 설명(빌드 번호·커밋)만 바꿔요(`scripts/ci-release.sh`). 릴리스가 없을 때만 새로 만들고, 실패하면 최대 4번 다시 해요. 그래서 `published_at` 은 처음 만든 날짜 그대로이고, 최신인지는 파일(asset)의 `updated_at` 과 설명의 빌드 번호로 봐요.
 - 시험용 앱의 서명 키(디버그 키) 파일은 Actions 캐시(`debug-keystore-v2`)에 두고 계속 같은 키로 서명해요 (`app/scripts/patch-android.mjs` 가 Gradle 에 그 경로를 알려줘요). 그래서 새 시험용 앱을 폰에 **덮어 설치**할 수 있어요. 캐시가 7일 넘게 안 쓰여 지워지면 키가 바뀌어서, 그때는 한 번 앱을 지우고 다시 설치해야 해요. 이 키는 비밀 키가 아니고 출시에는 쓰지 않아요 (출시용 키는 GitHub Secrets 에만 둬요).
 - 앱의 영구 ID(패키지 이름): `io.github.dodasifamily.issuewhy` (2026-10-16 확정, `app/capacitor.config.json` 의 `appId` 와 `server.hostname`). 구글 플레이에 처음 올리면 바꿀 수 없어요. 문의 이메일은 `issuewhyhelp@gmail.com` (`site/js/config.js` 의 `report.email`, 개인정보처리방침).
 - GitHub Pages 는 켜져 있어요 (Source = GitHub Actions). 사이트 주소: https://dodasifamily.github.io/why-trending/
