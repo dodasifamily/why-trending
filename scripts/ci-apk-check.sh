@@ -62,9 +62,23 @@ else
   fail=1
 fi
 
-# 시험용 앱을 폰에서 덮어 설치하려면 빌드마다 서명 키가 같아야 해요. 지문이 같은지 비교할 수 있게 적어 둬요.
-cert="$("$BT/apksigner" verify --print-certs "$APK" 2>/dev/null | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
-report+=$'\n'"서명 인증서 지문(SHA-256): ${cert:-읽지 못함}"
+# 시험용 앱을 폰에서 덮어 설치하려면 빌드마다 서명 키가 같아야 해요. 같은 키인지 비교할 수 있게 지문을 적어 둬요.
+case "${KEY_CACHE_HIT:-}" in
+  true) report+=$'\n'"🔑 서명 키: 저장해 둔 키를 불러왔어요" ;;
+  *)    report+=$'\n'"🔑 서명 키: 저장된 키가 없어 새로 만들었어요 (이번 빌드부터 저장해요)" ;;
+esac
+sig_out="$("$BT/apksigner" verify --print-certs "$APK" 2>&1)"
+cert="$(printf '%s\n' "$sig_out" | sed -n 's/^Signer #1 certificate SHA-256 digest: *//p' | head -n 1)"
+src="APK"
+if [ -z "$cert" ] && command -v keytool >/dev/null 2>&1 && [ -f "$HOME/.android/debug.keystore" ]; then
+  cert="$(keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey 2>/dev/null | sed -n 's/^Certificate fingerprint (SHA-256): *//p' | head -n 1)"
+  src="키 파일"
+fi
+if [ -n "$cert" ]; then
+  report+=$'\n'"서명 인증서 지문(SHA-256, ${src}에서 읽음): ${cert}"
+else
+  report+=$'\n'"서명 인증서 지문을 읽지 못했어요: $(printf '%s' "$sig_out" | head -n 2 | tr '\n' ' ' | cut -c1-240)"
+fi
 
 printf '%s\n' "$report"
 esc="$(printf '%s' "$report" | python3 -c 'import sys; t = sys.stdin.read(); print(t.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))')"
