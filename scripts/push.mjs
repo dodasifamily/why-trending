@@ -85,7 +85,7 @@ export function toFcmBody(m) {
       notification: { title: m.title, body: m.body },
       data: { route: m.route, group: m.group },
       android: {
-        priority: 'normal', // 아침 알림은 몇 분 늦어도 괜찮아요 (잠든 기기를 억지로 깨우지 않아요)
+        priority: 'high', // 정한 시각에 맞춰 도착해야 해서 high 예요 (normal 은 잠든 기기에 몇 시간 늦게 갈 수 있어요). 하루 한 번만 보내요
         ttl: '21600s', // 6시간 안에 못 받으면 버려요. 저녁에 '아침 알림'이 도착하지 않게 해요
         collapse_key: `daily_${m.group}`,
         notification: { channel_id: 'daily', tag: `daily_${m.group}`, icon: 'ic_stat_whyttuji', color: '#3347FF' }

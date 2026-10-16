@@ -57,7 +57,7 @@
 | 해설 갱신 확인 (Claude 대화) | 매일 06:40 (한국 시간) | 예약 작업이 실제로 도는지 확인되지 않아서, 대화가 직접 확인하고 오늘 분량이 없으면 `ops/daily-job.md` 대로 올려요 (`ops/fallback-runner.md`) |
 | 사이트 올리기 (`pages.yml`) | `site/` 가 바뀔 때, 매일 06:30 | 해설 검사 → 최근 14일 목록(`recent.json`) 만들기 → GitHub Pages 에 웹 화면과 최신 해설을 올려요. 앱도 여기서 최신 해설을 받아가요 |
 | 앱 만들기 (`android.yml`) | 화면·앱 설정이 바뀔 때 (해설 데이터만 바뀔 때는 안 돌아요) | 시험용 APK 를 만들어 릴리스 `test-latest` 에 올려요. 서명 키를 등록하면 출시용 AAB 도 만들어요. Firebase 설정을 등록해 두었다면 푸시 알림도 켜서 만들어요 |
-| 분야별 알림 보내기 (`push.yml`) | 매일 07:00·08:00·09:00 (한국 시간) | 오늘 해설이 있는 분야마다, 그 분야와 그 시각을 고른 기기에만 푸시 알림을 보내요. Firebase 키가 없으면 아무것도 안 하고 끝나요 |
+| 분야별 알림 보내기 (`push.yml`) | 매일 07:07·08:07·09:07 (한국 시간) | 오늘 해설이 있는 분야마다, 그 분야와 그 시각을 고른 기기에만 푸시 알림을 보내요. Firebase 키가 없으면 아무것도 안 하고 끝나요 |
 
 - 시험용 앱(폰에서 바로 설치): https://github.com/dodasifamily/why-trending/releases/download/test-latest/whyttuji-test.apk
 - 시험용 앱의 서명 키(디버그 키) 파일은 Actions 캐시(`debug-keystore-v2`)에 두고 계속 같은 키로 서명해요 (`app/scripts/patch-android.mjs` 가 Gradle 에 그 경로를 알려줘요). 그래서 새 시험용 앱을 폰에 **덮어 설치**할 수 있어요. 캐시가 7일 넘게 안 쓰여 지워지면 키가 바뀌어서, 그때는 한 번 앱을 지우고 다시 설치해야 해요. 이 키는 비밀 키가 아니고 출시에는 쓰지 않아요 (출시용 키는 GitHub Secrets 에만 둬요).

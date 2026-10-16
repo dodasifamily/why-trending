@@ -1247,7 +1247,7 @@
           h('div', { class: 'ptitle' }, '내 분야'),
           myPills.length ? h('div', { class: 'mypills', style: 'margin-top:12px' }, myPills) : h('p', { class: 'sub', style: 'margin:8px 0 0' }, S.groups ? '아직 고르지 않았어요.' : '분야 목록을 불러오지 못했어요.'),
           S.groups ? h('button', { class: 'btn ghost', type: 'button', style: 'margin-top:14px', onclick: () => go('/pick') }, '분야 바꾸기') : null,
-          h('div', { class: 'info' }, icon('info', 16), h('span', null, push ? '고른 분야의 이슈만 보여주고 알려드려요. 새 해설이 없는 분야는 알림이 오지 않아요. 정치, 사건사고, 실명 의혹은 다루지 않아요.' : '고른 분야의 이슈만 오늘 화면에 보여요. 정치, 사건사고, 실명 의혹은 다루지 않아요.'))
+          h('div', { class: 'info' }, icon('info', 16), h('span', null, push ? '고른 분야의 이슈만 보여주고 알려드려요. 새 해설이 없는 분야는 알림이 오지 않아요. 알림은 정한 시각보다 몇 분 늦게 올 수 있어요. 정치, 사건사고, 실명 의혹은 다루지 않아요.' : '고른 분야의 이슈만 오늘 화면에 보여요. 정치, 사건사고, 실명 의혹은 다루지 않아요.'))
         ),
         h('div', { class: 'info' }, icon('info', 16), h('span', null, AI_NOTE)),
         h('p', { class: 'legal' }, h('a', { href: 'privacy.html' }, '개인정보처리방침'))

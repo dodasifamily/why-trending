@@ -14,6 +14,7 @@ on:
       - '!site/data/**'   # 매일 바뀌는 해설 데이터는 앱이 인터넷에서 직접 받아와서, 앱을 다시 만들 필요가 없어요
       - 'app/**'
       - 'scripts/**'
+      - '!scripts/push*.mjs'   # 알림을 보내는 서버 쪽 스크립트는 앱 안에 들어가지 않아서, 바뀌어도 앱을 다시 만들지 않아요
       - '.github/workflows/android.yml'
   workflow_dispatch:
 
