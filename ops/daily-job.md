@@ -12,7 +12,7 @@
 GitHub 저장소 dodasifamily/why-trending 의 site/data/today.json 을 '오늘(한국 시간)'의 새 해설 카드 **8~14개(목표 9~11개)** 로 바꾸고, 같은 카드를 site/data/terms.json(사전)에도 합쳐서 main 브랜치에 올려요. 검사(`validate`)가 강제하는 것: 하루 7~14개, 서로 다른 분야 5곳 이상, 한 분야는 하루 4개까지. **분야마다 하루 1~2개**가 목표예요. 올라가면 앱과 웹사이트가 새 내용을 보여줘요. 틀린 사실을 올리는 것보다 아무것도 안 올리는 편이 언제나 나아요.
 
 # 0. 준비
-1. 이 파일을 읽고 있다면 저장소는 이미 clone 되어 있어요. 그 폴더에서 일하세요. (clone 이 없으면: mcp__claude-code-remote__add_repo 를 owner=dodasifamily, repo=why-trending, access=push 로 호출하고, 결과가 알려주는 방법대로 clone 한 뒤 mcp__claude-code-remote__register_repo_root 를 호출하세요. 도구가 목록에 안 보이면 ToolSearch 로 불러오세요.)
+1. 이 파일을 읽고 있다면 저장소는 이미 clone 되어 있어요. 그 폴더(보통 /home/claude/why-trending)에서 일하세요. 예약 작업(무인 실행) 세션에는 add_repo·register_repo_root 도구가 없는 게 정상이에요(2026-10-17 점검에서 확인) — 그 도구를 찾느라 멈추지 말고 이미 있는 clone 을 쓰세요. (clone 이 정말 없을 때만: mcp__claude-code-remote__add_repo 를 owner=dodasifamily, repo=why-trending, access=push 로 호출하고, 결과가 알려주는 방법대로 clone 한 뒤 mcp__claude-code-remote__register_repo_root 를 호출하세요. 도구가 목록에 안 보이면 ToolSearch 로 불러오세요.)
 2. 저장소 안에서 git config user.name dodasifamily, git config user.email 343218877+dodasifamily@users.noreply.github.com 를 설정하고, git fetch origin main 으로 최신 main 에서 시작하세요. (git 프록시는 동시 작업을 2개까지만 받으니 git 명령은 한 번에 하나씩 차례로 실행하세요.)
 3. 오늘 날짜(한국 시간): TODAY=$(TZ=Asia/Seoul date +%F). site/data/today.json 의 date 가 이미 TODAY 이고 카드가 7개 이상이면 오늘 분량은 이미 올라간 것이니 아무것도 바꾸지 말고 "이미 갱신돼 있어요"라고만 보고하고 끝내세요.
 4. README.md 와 scripts/content.mjs(규칙과 금지어 목록 BLOCKED_WORDS, 영상 허용 매체 VIDEO_FROM_HOSTS)를 읽으세요. site/data/categories.json 에서 분야 id 와 이름을 확인하세요. site/data/terms.json 과 today.json 을 읽어 지금까지 다룬 말(keyword)과 말투·길이의 본보기를 파악하세요. `node scripts/content.mjs validate` 를 돌리면 '최근 14일 해설이 5개 미만인 분야'가 나와요. **그 분야부터 채워요.**
@@ -26,6 +26,7 @@ GitHub 저장소 dodasifamily/why-trending 의 site/data/today.json 을 '오늘(
 소재는 아래 1-1~1-4 를 모두 거쳐 **후보 목록**을 만든 뒤 1-5 에서 고르세요. 어느 분야에서든 "오늘 한국 매체 여러 곳이 크게 다룬 소식"이 빠지면 안 돼요. (예: 해외에서 열린 신제품 공개 행사, 새 걸그룹 데뷔, 대형 대회 개막.) 단서 사이트는 후보를 찾는 용도일 뿐 출처로는 쓰지 않아요. 안 열리는 페이지는 건너뛰세요. 한편 뉴스에는 거의 안 나오고 Z세대 매체·뉴스레터·숏폼에서 먼저 퍼지는 **유행어·밈 표현**(예: 'L을 가져가')은 기사 수로 점수를 매기면 매번 빠져요. 그래서 1-1 의 '표현·밈 단서'로 찾고, 1-2 의 '표현·밈 트랙'으로 따로 판단해요.
 
 ## 1-1. 단서 모으기 (WebFetch)
+- (무인 실행 주의) 사람이 없을 때는 WebFetch 가 처음 보는 주소를 PROVENANCE_REQUIRED 로 막고 권한 요청이 응답 없이 사라질 수 있어요(2026-10-17 점검에서 확인). 아래 단서 주소가 막히면 재시도하지 말고 건너뛴 뒤, 분야별 WebSearch(1-2)로 소재를 찾고 결과에 나온 기사 주소로 읽으세요.
 - 분야별 화제 정리 페이지(매체 이름과 함께 정리돼 있어요): https://issueitnow.com/kr/meme/ · https://issueitnow.com/kr/music/ · https://issueitnow.com/kr/movie/ · https://issueitnow.com/kr/game/ · https://issueitnow.com/kr/food/ · https://issueitnow.com/kr/fashion/ · https://issueitnow.com/kr/tech/ · https://issueitnow.com/kr/tiktok/ · https://issueitnow.com/kr/instagram/ · https://www.instablank.com/meme?year=2026
 - 순위·검색어 단서: Google 급상승 검색어 https://trends.google.com/trending/rss?geo=KR (정치·사건이 많아요. 연예·스포츠·제품 이름만 골라 단서로 써요) · Netflix 한국 순위 https://flixpatrol.com/top10/netflix/south-korea/ · Spotify 한국 일간 차트 https://kworb.net/spotify/country/kr_daily.html · 게임 순위 https://www.gamemeca.com/ranking.php · 게임 뉴스 목록 https://www.gamemeca.com/news.php (목록의 기사 링크는 다른 기사가 열리는 일이 있으니 제목으로 WebSearch 해서 나온 주소를 쓰세요)
 - **유튜브 화제**(사용자 요청): 유튜브 '인기 급상승' 페이지는 2025년에 없어졌어요. 조회수가 급상승한 영상이나 이슈 영상은 **소재 단서로만** 써요. https://issueitnow.com/kr/youtube/ (한국 영상 24시간 조회수 순위), WebSearch '유튜브 조회수 급상승 ○○', '쇼츠 챌린지 유행', '공식 채널 영상 조회수 돌파', '○○ 영상 100만 뷰' 같은 검색으로 영상·챌린지·클립이 계기가 된 소재를 후보에 넣어요. 영상 자체·댓글·채널 소개·집계 페이지는 출처가 아니에요. 카드의 사실은 언론사 기사 2곳 이상에서 확인된 것만 쓰고, 조회수는 기사에 적힌 것만 '○월 ○일 기준'으로 써요. 영상이 계기라면 `why` 에 '어떤 영상이 어떻게 퍼졌는지'를 기사 내용 그대로 담아요.
@@ -141,7 +142,7 @@ today.json 형식: {"schema":1,"date":"TODAY","updatedAt":"<TZ=Asia/Seoul date +
 5. git diff --name-only 에는 site/data/today.json 과 site/data/terms.json 두 파일만 나와야 해요. 다른 파일이 보이면 되돌리세요.
 
 # 5. 올리기
-git add site/data/today.json site/data/terms.json → git commit(제목: "Daily cards for TODAY: 키워드들", 본문 한두 줄) → git push origin HEAD:main. 커밋 메시지 끝에는 이 일을 맡긴 쪽이 알려준 서명 줄(Co-Authored-By, Claude-Session)을 그대로 붙이세요. 알려주지 않았다면 'Co-Authored-By: Claude <noreply@anthropic.com>' 한 줄만 붙이세요. push 가 거절되면 git fetch origin main, git rebase origin/main 을 하고 validate 를 다시 돌린 뒤 한 번 더 push 하세요. 올린 뒤 git ls-remote origin main 의 해시가 내 커밋과 같은지 확인하세요.
+git add site/data/today.json site/data/terms.json → git commit(제목: "Daily cards for TODAY: 키워드들", 본문 한두 줄) → git push origin HEAD:main. 커밋 메시지 끝에는 이 일을 맡긴 쪽이 알려준 서명 줄(Co-Authored-By, Claude-Session)을 그대로 붙이세요. 알려주지 않았다면 'Co-Authored-By: Claude <noreply@anthropic.com>' 한 줄만 붙이세요. push 하기 직전에 git fetch origin main 으로 한 번 더 확인하세요. 그 사이 다른 담당(예약 작업과 06:40 확인 담당이 둘 다 돌 수 있어요)이 오늘 분량을 올렸다면(origin/main 의 today.json 이 오늘 날짜에 카드 7개 이상) 내 변경은 버리고(git reset --hard origin/main) '이미 갱신돼 있어요'라고 보고하세요. push 가 거절되면 git fetch origin main, git rebase origin/main 을 하고(같은 확인을 다시 해요) validate 를 다시 돌린 뒤 한 번 더 push 하세요. 올린 뒤 git ls-remote origin main 의 해시가 내 커밋과 같은지 확인하세요.
 
 **올리는 시각과 푸시 알림**: 분야별 알림(푸시)은 한국 시간 07:07·08:07·09:07 에 '오늘 날짜(KST)의 카드'를 main 에서 읽어서 보내요(`scripts/push.mjs`). 오늘 카드가 아직 없으면 07:32 까지(3분마다 다시 확인) 기다린 뒤, 그래도 없으면 보내지 않고 끝나요(어제 해설로 '새 해설' 알림을 보내지 않으려는 거예요). 그래서 **가능하면 07:00 전에 올리세요.** 카드의 `date` 는 반드시 오늘(KST) 날짜여야 해요.
 
