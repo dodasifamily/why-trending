@@ -23,11 +23,12 @@
 
 ### 분야 (내 분야 고르기)
 
-- 사용자는 처음 실행할 때 관심 분야를 고르고(여러 개), 오늘 화면에는 그 분야의 해설만 나와요. 선택은 그 기기 안에만 저장돼요(`localStorage` 의 `wt.cats`). 오늘 화면 위쪽 '바꾸기'나 알림 탭의 '분야 바꾸기'로 언제든 바꿀 수 있어요. 오늘 해설이 없는 날에도 '지난 며칠'(최근 7일) 목록으로 내 분야의 최신 이슈를 볼 수 있어요.
+- 사용자는 처음 실행할 때 관심 분야를 고르고(여러 개), 오늘 화면에는 고른 분야마다 한 묶음씩 나와요. 한 묶음은 **오늘 + 최근 2주(14일)의 해설을 최신 순으로 최대 7개**예요(가장 최근 것은 큰 카드, 나머지는 날짜가 붙은 작은 카드). 선택은 그 기기 안에만 저장돼요(`localStorage` 의 `wt.cats`). 오늘 화면 위쪽 '바꾸기'나 알림 탭의 '분야 바꾸기'로 언제든 바꿀 수 있어요. 오늘 해설이 없는 날에도 지난 해설이 그대로 보여서, 분야를 골라도 비어 보이지 않아요.
 - 분야 목록(id·이름·설명·아이콘 이름·색)은 `site/data/categories.json` **하나만** 기준이에요. 앱 화면과 `scripts/content.mjs` 검사가 같은 파일을 읽어요. 카드의 `group` 은 여기에 있는 `id` 여야 해요 (meme · ent · screen · sports · game · shop · tech).
 - 분야를 더하려면 `categories.json` 에 항목을 넣고, 새 아이콘이면 `site/js/app.js` 의 `ICONS` 에 같은 이름의 그림을 더해요. (이름이 없으면 기본 그림이 나와요.)
-- 하루 카드는 5~10개, 서로 다른 분야 4곳 이상, 한 분야 최대 4개예요 (`validate` 가 강제해요). 최근 7일 동안 해설이 하나도 없는 분야는 `validate` 가 알려줘요.
-- `site/data/recent.json`(최근 7일 해설)은 사전(`terms.json`)에서 **올릴 때마다 만들어지는 파일**이에요(`node scripts/content.mjs recent`, `pages.yml`·`android.yml` 이 실행). 저장소에는 올리지 않아요(`.gitignore`).
+- 하루 카드는 7~14개(목표 9~11개), 서로 다른 분야 5곳 이상, 한 분야 최대 4개예요 (`validate` 가 강제해요). 분야마다 하루 1~2개가 목표예요. 분야마다 최근 14일 해설이 5개 이상 있어야 앱에서 5~7개가 보여서, 5개 미만인 분야는 `validate` 가 알려줘요.
+- `site/data/recent.json`(최근 14일 해설, 분야마다 최대 7개)은 사전(`terms.json`)에서 **올릴 때마다 만들어지는 파일**이에요(`node scripts/content.mjs recent`, `pages.yml`·`android.yml` 이 실행). 저장소에는 올리지 않아요(`.gitignore`). 앱은 오늘 해설(`today.json`)과 이 파일을 합쳐 분야별 목록을 만들어요.
+- 후보 카드를 미리 검사하려면 `node scripts/content.mjs check <파일.json>`, 최근 14일 안의 지난 화제를 사전에만 더하려면 `node scripts/content.mjs add <파일.json>` 을 써요(자세한 규칙은 `ops/daily-job.md`).
 
 ### 사진·영상 (`media`)
 
@@ -44,7 +45,7 @@
 | --- | --- | --- |
 | 해설 갱신 (예약 작업 '왜뜨지 매일 해설 갱신') | 매일 05:50 (한국 시간) | 오늘 화제를 찾아 기사로 확인하고 `site/data/` 의 두 파일(`today.json`, `terms.json`)만 고쳐 올려요 |
 | 해설 갱신 확인 (Claude 대화) | 매일 06:40 (한국 시간) | 예약 작업이 실제로 도는지 확인되지 않아서, 대화가 직접 확인하고 오늘 분량이 없으면 `ops/daily-job.md` 대로 올려요 (`ops/fallback-runner.md`) |
-| 사이트 올리기 (`pages.yml`) | `site/` 가 바뀔 때, 매일 06:30 | 해설 검사 → 최근 7일 목록(`recent.json`) 만들기 → GitHub Pages 에 웹 화면과 최신 해설을 올려요. 앱도 여기서 최신 해설을 받아가요 |
+| 사이트 올리기 (`pages.yml`) | `site/` 가 바뀔 때, 매일 06:30 | 해설 검사 → 최근 14일 목록(`recent.json`) 만들기 → GitHub Pages 에 웹 화면과 최신 해설을 올려요. 앱도 여기서 최신 해설을 받아가요 |
 | 앱 만들기 (`android.yml`) | 화면·앱 설정이 바뀔 때 (해설 데이터만 바뀔 때는 안 돌아요) | 시험용 APK 를 만들어 릴리스 `test-latest` 에 올려요. 서명 키를 등록하면 출시용 AAB 도 만들어요 |
 
 - 시험용 앱(폰에서 바로 설치): https://github.com/dodasifamily/why-trending/releases/download/test-latest/whyttuji-test.apk

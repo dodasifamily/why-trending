@@ -45,7 +45,7 @@
     groups: null, // 분야 목록 (categories.json 의 groups)
     groupsState: 'loading', // loading | ok | error
     cats: cleanCats(store.get('cats', null)), // 내가 고른 분야 id 목록. null 이면 아직 고르지 않은 거예요(첫 실행)
-    recent: null, // 최근 7일 해설 (recent.json)
+    recent: null, // 최근 14일 해설 (recent.json)
     dictGroup: 'all', // 사전에서 보고 있는 분야 ('all' = 전체)
     alertOn: store.get('alertOn', false) === true,
     hour: HOURS.includes(store.get('hour', 8)) ? store.get('hour', 8) : 8,
@@ -206,7 +206,7 @@
       });
   }
 
-  /** 오늘 해설·분야 목록·최근 7일 해설을 한꺼번에 새로 받아요. 하나가 안 와도 나머지는 그대로 써요 */
+  /** 오늘 해설·분야 목록·최근 14일 해설을 한꺼번에 새로 받아요. 하나가 안 와도 나머지는 그대로 써요 */
   function refreshData(showLoading) {
     if (showLoading && !S.today) {
       S.todayState = 'loading';
@@ -304,12 +304,6 @@
   function needsPick() {
     return !!S.groups && !myCats();
   }
-  /** 이 해설이 내 분야인지. 고르기 전이거나 분야 목록에 없는 분야면 숨기지 않아요 */
-  function isMine(c) {
-    const mine = myCats();
-    if (!mine || !groupIds().includes(c.group)) return true;
-    return mine.includes(c.group);
-  }
   function saveCats(ids) {
     const order = groupIds();
     S.cats = order.filter((id) => ids.includes(id));
@@ -335,21 +329,48 @@
     return h('i', { class: 'gdot', style: `background:${groupColors(groupOf(groupId)).a1}` });
   }
 
-  function visibleCards() {
-    const list = (S.today && S.today.cards) || [];
-    return list.filter(isMine);
+  // ---------- 분야별 목록 ----------
+  // 분야마다 '오늘 + 최근 2주' 해설을 최신 순으로 최대 FEED_MAX 개 보여줘요 (scripts/content.mjs 의 FEED_MAX_PER_GROUP 과 같은 값)
+  const FEED_MAX = 7;
+  const FEED_DAYS = 14;
+
+  /** 오늘 해설과 최근 해설을 합쳐서 (같은 id 는 오늘 쪽 하나만) 최신 날짜 순으로 */
+  function feedCards() {
+    const seen = new Set();
+    const out = [];
+    const add = (c) => {
+      if (!c || typeof c.id !== 'string' || seen.has(c.id)) return;
+      seen.add(c.id);
+      out.push(c);
+    };
+    if (S.today) S.today.cards.forEach(add);
+    if (S.recent) S.recent.cards.forEach(add);
+    const base = S.today ? S.today.date : localYmd();
+    return out.filter((c) => daysApart(c.date, base) < FEED_DAYS).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }
 
-  /** '지난 며칠': 오늘 해설보다 앞선 날짜의 내 분야 해설을 날짜별로 묶어서 (최신 날짜 먼저) */
-  function pastDays() {
-    if (!S.today || !S.recent) return [];
-    const byDate = new Map();
-    for (const c of S.recent.cards) {
-      if (!c || !(c.date < S.today.date) || !isMine(c)) continue;
-      if (!byDate.has(c.date)) byDate.set(c.date, []);
-      byDate.get(c.date).push(c);
-    }
-    return [...byDate.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([date, cards]) => ({ date, cards }));
+  /** 내 분야마다 하나씩. 분야 목록에 없는 분야의 해설은 '기타'로, 분야 목록을 못 받았으면 한 목록으로 */
+  function feedSections() {
+    const all = feedCards();
+    if (!S.groups) return [{ id: '', label: '최근 해설', cards: all.slice(0, FEED_MAX * 2) }];
+    const ids = groupIds();
+    const secs = (myCats() || ids).map((id) => ({ id, label: groupOf(id).label, cards: all.filter((c) => c.group === id).slice(0, FEED_MAX) }));
+    const other = all.filter((c) => !ids.includes(c.group)).slice(0, FEED_MAX);
+    if (other.length) secs.push({ id: '', label: '기타', cards: other });
+    return secs;
+  }
+
+  /** 해설 날짜를 짧게: 오늘 / 어제 / 10월 14일 */
+  function dayText(s) {
+    const now = localYmd();
+    if (s === now) return '오늘';
+    if (daysApart(s, now) === 1) return '어제';
+    const d = parseYmd(s);
+    return d ? `${d.getMonth() + 1}월 ${d.getDate()}일` : '';
+  }
+  function dayTag(s) {
+    const t = dayText(s);
+    return t ? h('span', { class: t === '오늘' ? 'dtag now' : 'dtag' }, t) : null;
   }
 
   // ---------- 길 찾기(라우터) ----------
@@ -420,20 +441,33 @@
     return h(
       'button',
       { class: 'card', type: 'button', onclick: () => go('/t/' + encodeURIComponent(c.id)) },
-      catPill(c),
+      h('span', { class: 'ctop' }, catPill(c), dayTag(c.date)),
       h('span', { class: 'kw' }, h('span', { class: 'hl' }, c.keyword)),
       h('span', { class: 'ln' }, c.line),
       h('span', { class: 'more' }, h('span', null, '왜 뜨지? 보기'), icon('right'))
     );
   }
 
-  /** 목록용 작은 카드 (사전, 지난 며칠) */
-  function termRow(c) {
+  /** 목록용 작은 카드. 사전에서는 분야 점 + 세부 분류, 분야별 목록에서는 세부 분류 + 날짜 */
+  function termRow(c, withDate) {
     return h(
       'button',
       { class: 'term', type: 'button', onclick: () => go('/t/' + encodeURIComponent(c.id)) },
-      h('span', { class: 'row' }, h('span', { class: 'nm' }, c.keyword), h('span', { class: 'tg' }, gdot(c.group), c.cat)),
+      h('span', { class: 'row' }, h('span', { class: 'nm' }, c.keyword), withDate ? h('span', { class: 'tg' }, h('span', { class: 'tcat' }, c.cat), dayTag(c.date)) : h('span', { class: 'tg' }, gdot(c.group), c.cat)),
       h('span', { class: 'ml', style: 'display:block' }, c.line)
+    );
+  }
+
+  /** 분야 하나: 제목 + 가장 최근 해설은 큰 카드로, 나머지는 작은 카드로 */
+  function sectionNode(sec) {
+    const items = sec.cards;
+    return h(
+      'section',
+      { class: 'sec', 'aria-label': sec.label },
+      h('div', { class: 'sechead' }, h('h2', { class: 'sech' }, sec.id ? gdot(sec.id) : null, h('span', null, labelNodes(sec.label))), items.length ? h('span', { class: 'secn' }, items.length + '개') : null),
+      items.length
+        ? [cardButton(items[0]), items.length > 1 ? h('div', { class: 'tlist' }, items.slice(1).map((c) => termRow(c, true))) : null]
+        : h('p', { class: 'secnone' }, '최근 2주 동안 올라온 해설이 아직 없어요.')
     );
   }
 
@@ -464,29 +498,21 @@
       // 분야 목록이 와야 '내 분야'를 걸러낼 수 있어요. 잠깐이라 안내만 보여줘요 (못 받으면 전부 보여줘요)
       nodes.push(h('p', { class: 'note', role: 'status' }, '해설을 불러오고 있어요…'));
     } else {
-      const cards = visibleCards();
-      const past = pastDays();
+      const secs = feedSections();
       if (daysApart(S.today.date, localYmd()) >= 2) nodes.push(h('p', { class: 'stale', role: 'status' }, '업데이트가 조금 늦어지고 있어요. 지난 해설을 보여드려요.'));
       nodes.push(myCatsRow());
-      if (cards.length) {
-        nodes.push(h('h2', { class: 'lh' }, daysApart(S.today.date, localYmd()) <= 1 ? '오늘' : '가장 최근'));
-        nodes.push(h('div', { class: 'cards' }, cards.map(cardButton)));
+      if (secs.some((s) => s.cards.length)) {
+        secs.forEach((s) => nodes.push(sectionNode(s)));
       } else {
         nodes.push(
           h(
             'div',
             { class: 'box' },
-            h('h2', null, '오늘은 내 분야의 새 해설이 없어요'),
-            h('p', null, past.length ? '아래에서 지난 며칠 동안 올라온 해설을 볼 수 있어요.' : '새 해설이 올라오면 여기에 보여요. 분야를 바꾸면 다른 해설도 볼 수 있어요.'),
+            h('h2', null, '내 분야의 해설이 아직 없어요'),
+            h('p', null, '새 해설이 올라오면 여기에 보여요. 분야를 바꾸면 다른 해설도 볼 수 있어요.'),
             h('button', { class: 'btn ghost', type: 'button', onclick: () => go('/pick') }, '분야 바꾸기')
           )
         );
-      }
-      if (past.length) {
-        nodes.push(h('h2', { class: 'lh' }, '지난 며칠'));
-        past.forEach((day) => {
-          nodes.push(h('h3', { class: 'dayh' }, koDate(day.date)), h('div', { class: 'tlist' }, day.cards.map(termRow)));
-        });
       }
       nodes.push(h('p', { class: 'note' }, AI_NOTE));
     }

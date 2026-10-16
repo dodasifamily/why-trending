@@ -3,7 +3,9 @@
 //
 //   node scripts/content.mjs validate   categories.json / today.json / terms.json 규칙 검사 (어기면 종료 코드 1)
 //   node scripts/content.mjs merge      today.json 의 카드를 terms.json(사전)에 합치기
-//   node scripts/content.mjs recent     최근 7일 해설만 모은 recent.json 만들기 (사이트·앱을 올릴 때 자동으로 만들어져요. 저장소에는 올리지 않아요)
+//   node scripts/content.mjs recent     최근 2주 해설을 분야마다 7개까지 모은 recent.json 만들기 (사이트·앱을 올릴 때 자동으로 만들어져요. 저장소에는 올리지 않아요)
+//   node scripts/content.mjs check <카드목록.json>   새 카드 후보 파일이 규칙에 맞는지만 검사 (사전·today 는 건드리지 않아요)
+//   node scripts/content.mjs add <카드목록.json>     검사를 통과한 지난 카드를 사전(terms.json)에만 추가 (오늘 카드는 today.json + merge 로 올려요)
 //
 // 옵션: --site <폴더>   기본값은 site
 //
@@ -26,11 +28,14 @@ const RECENT_PATH = join(siteDir, 'data', 'recent.json');
 let GROUPS = [];
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 // 하루 카드는 여러 분야에 골고루 있어야 '내 분야' 만 골라 본 사람도 매일 볼 거리가 있어요.
-const MIN_CARDS_PER_DAY = 5;
-const MAX_CARDS_PER_DAY = 10;
-const MIN_GROUPS_PER_DAY = 4; // 하루 카드가 걸쳐야 하는 서로 다른 분야 수
+// 앱은 고른 분야마다 오늘 해설 + 최근 2주 해설을 합쳐 최대 FEED_MAX_PER_GROUP 개를 보여줘요. 그래서 분야마다 하루 1~2개씩 꾸준히 쌓여야 해요.
+const MIN_CARDS_PER_DAY = 7;
+const MAX_CARDS_PER_DAY = 14;
+const MIN_GROUPS_PER_DAY = 5; // 하루 카드가 걸쳐야 하는 서로 다른 분야 수
 const MAX_PER_GROUP_PER_DAY = 4; // 한 분야가 하루 카드를 독차지하지 않게
-const RECENT_DAYS = 7; // 앱 '지난 며칠' 목록에 보여주는 기간
+const RECENT_DAYS = 14; // 앱 분야별 목록에 쓰는 지난 해설 기간 (오늘 포함 14일)
+const FEED_MAX_PER_GROUP = 7; // 앱이 분야마다 보여주는 최대 개수 (recent.json 도 분야마다 이만큼만 담아요)
+const FEED_MIN_PER_GROUP = 5; // 분야마다 최근 RECENT_DAYS 일 안에 이만큼은 있어야 해요 (모자라면 validate 가 알려줘요)
 // '오늘 뜨는 말'인데 몇 달 전 기사만 있으면 지금 뜨는 게 아닐 수 있어요.
 // 카드 날짜 기준, 가장 최근 출처가 이 일수 안에 있어야 오늘의 카드로 올릴 수 있어요. (사전 항목에는 적용하지 않아요)
 const MAX_SOURCE_AGE_DAYS = 45;
@@ -314,13 +319,16 @@ function validate() {
   }
   console.log(`✅ 콘텐츠 검사 통과: 분야 ${GROUPS.length}개, 오늘 ${today.cards.length}개, 사전 ${terms.terms.length}개`);
 
-  // 통과해도 알려주는 참고 사항(실패는 아니에요): 최근 7일 동안 해설이 하나도 없는 분야
+  // 통과해도 알려주는 참고 사항(실패는 아니에요): 최근 2주 동안 해설이 모자란 분야
   if (isRealDate(today.date)) {
     const from = shiftDate(today.date, -(RECENT_DAYS - 1));
-    const seen = new Set(terms.terms.filter((c) => c.date >= from && c.date <= today.date).map((c) => c.group));
-    const empty = cats.groups.filter((g) => !seen.has(g.id));
-    if (empty.length) {
-      console.log(`⚠️ 최근 ${RECENT_DAYS}일 동안 해설이 없는 분야: ${empty.map((g) => `${g.label}(${g.id})`).join(', ')} — 오늘 카드에서 채워 주세요`);
+    const count = {};
+    for (const c of terms.terms) if (c.date >= from && c.date <= today.date) count[c.group] = (count[c.group] || 0) + 1;
+    const low = cats.groups.filter((g) => (count[g.id] || 0) < FEED_MIN_PER_GROUP);
+    if (low.length) {
+      console.log(`⚠️ 최근 ${RECENT_DAYS}일 해설이 ${FEED_MIN_PER_GROUP}개 미만인 분야: ${low.map((g) => `${g.label}(${g.id}) ${count[g.id] || 0}개`).join(', ')} — 오늘 카드에서 이 분야부터 채워 주세요`);
+    } else {
+      console.log(`✅ 모든 분야에 최근 ${RECENT_DAYS}일 해설이 ${FEED_MIN_PER_GROUP}개 이상 있어요`);
     }
   }
 }
@@ -345,7 +353,7 @@ function merge() {
   console.log(`✅ 사전에 합쳤어요: 총 ${terms.terms.length}개`);
 }
 
-// 앱 첫 화면의 '지난 며칠' 목록용 파일을 만들어요. 사전(terms.json)은 계속 커지니까, 최근 7일 분량만 따로 담아요.
+// 앱 첫 화면의 분야별 목록에 쓰는 파일을 만들어요. 사전(terms.json)은 계속 커지니까, 최근 2주 해설을 분야마다 최신순 7개까지만 담아요.
 // today.json 의 날짜를 기준으로 하고, 사전에서 파생되는 파일이라 저장소에는 올리지 않고 올릴 때마다 새로 만들어요.
 function recent() {
   const today = readJson(TODAY_PATH);
@@ -354,21 +362,84 @@ function recent() {
   const byId = new Map();
   for (const c of [...(Array.isArray(terms.terms) ? terms.terms : []), ...today.cards]) byId.set(c.id, c);
   const from = shiftDate(today.date, -(RECENT_DAYS - 1));
-  const cards = [...byId.values()]
+  const inWindow = [...byId.values()]
     .map((c, idx) => ({ c, idx }))
     .filter((x) => x.c.date >= from && x.c.date <= today.date)
+    .sort((a, b) => (a.c.date < b.c.date ? 1 : a.c.date > b.c.date ? -1 : a.idx - b.idx));
+  const perGroup = {};
+  const cards = inWindow
+    .filter((x) => {
+      perGroup[x.c.group] = (perGroup[x.c.group] || 0) + 1;
+      return perGroup[x.c.group] <= FEED_MAX_PER_GROUP;
+    })
+    .map((x) => x.c);
+  writeJson(RECENT_PATH, { schema: 1, updatedAt: today.updatedAt, days: RECENT_DAYS, perGroup: FEED_MAX_PER_GROUP, cards });
+  console.log(`✅ 최근 ${RECENT_DAYS}일 해설 ${cards.length}개(분야마다 최대 ${FEED_MAX_PER_GROUP}개)를 recent.json 에 담았어요 (${from} ~ ${today.date})`);
+}
+
+// 새 카드 후보 파일(JSON 배열)을 규칙에 맞춰 검사해요. 사전·today 는 읽기만 하고, 통과한 카드 목록을 돌려줘요.
+function checkFile(file) {
+  if (!file) throw new Error('사용법: node scripts/content.mjs check <카드목록.json>');
+  loadCategories();
+  const today = readJson(TODAY_PATH);
+  const terms = existsSync(TERMS_PATH) ? readJson(TERMS_PATH) : { terms: [] };
+  const raw = readJson(resolve(file));
+  const cards = Array.isArray(raw) ? raw : raw && Array.isArray(raw.cards) ? raw.cards : null;
+  if (!cards) throw new Error('카드 목록(JSON 배열)이 아니에요');
+  const known = Array.isArray(terms.terms) ? terms.terms : [];
+  const ids = new Set(known.map((c) => c.id));
+  const kws = new Set(known.map((c) => String(c.keyword).replace(/\s+/g, '')));
+  const seenIds = new Set();
+  const seenKws = new Set();
+  const from = isRealDate(today.date) ? shiftDate(today.date, -(RECENT_DAYS - 1)) : null;
+  cards.forEach((c, i) => {
+    const w = `cards[${i}]${c && c.id ? ` (${c.id})` : ''}`;
+    validateCard(c, w);
+    if (!c || typeof c !== 'object') return;
+    checkFreshness(c, w);
+    if (isRealDate(c.date) && from) {
+      if (c.date > today.date) err(w, `date(${c.date}) 가 오늘(${today.date}) 보다 미래예요`);
+      else if (c.date < from) err(w, `date(${c.date}) 가 최근 ${RECENT_DAYS}일(${from} ~ ${today.date}) 밖이에요. 앱 목록에 나오지 않아요`);
+    }
+    if (ids.has(c.id) || seenIds.has(c.id)) err(w, `id 가 사전이나 이 파일 안에서 겹쳐요: ${c.id}`);
+    seenIds.add(c.id);
+    const k = String(c.keyword).replace(/\s+/g, '');
+    if (kws.has(k) || seenKws.has(k)) err(w, `같은 키워드가 사전이나 이 파일 안에 이미 있어요: ${c.keyword}`);
+    seenKws.add(k);
+  });
+  if (errors.length) {
+    console.error(`❌ 카드 검사 실패 (${errors.length}건)`);
+    for (const e of errors) console.error(' - ' + e);
+    process.exit(1);
+  }
+  const byGroup = {};
+  for (const c of cards) byGroup[c.group] = (byGroup[c.group] || 0) + 1;
+  console.log(`✅ 카드 ${cards.length}개 통과 (${Object.entries(byGroup).map(([g, n]) => `${g} ${n}`).join(', ')})`);
+  return { cards, terms };
+}
+
+// 지난 날짜의 카드를 사전에만 더해요 (앱의 분야별 목록은 사전에서 recent.json 을 만들어 써요).
+function add(file) {
+  const { cards, terms } = checkFile(file);
+  const list = Array.isArray(terms.terms) ? terms.terms : [];
+  const merged = [...list, ...cards]
+    .map((c, idx) => ({ c, idx }))
     .sort((a, b) => (a.c.date < b.c.date ? 1 : a.c.date > b.c.date ? -1 : a.idx - b.idx))
     .map((x) => x.c);
-  writeJson(RECENT_PATH, { schema: 1, updatedAt: today.updatedAt, days: RECENT_DAYS, cards });
-  console.log(`✅ 최근 ${RECENT_DAYS}일 해설 ${cards.length}개를 recent.json 에 담았어요 (${from} ~ ${today.date})`);
+  terms.schema = 1;
+  terms.terms = merged;
+  writeJson(TERMS_PATH, terms);
+  console.log(`✅ 사전에 ${cards.length}개를 더했어요: 총 ${merged.length}개`);
 }
 
 try {
   if (command === 'validate') validate();
   else if (command === 'merge') merge();
   else if (command === 'recent') recent();
+  else if (command === 'check') checkFile(argv[1]);
+  else if (command === 'add') add(argv[1]);
   else {
-    console.error('사용법: node scripts/content.mjs <validate|merge|recent> [--site site]');
+    console.error('사용법: node scripts/content.mjs <validate|merge|recent|check|add> [카드목록.json] [--site site]');
     process.exit(2);
   }
 } catch (e) {
