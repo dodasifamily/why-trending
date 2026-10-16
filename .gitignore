@@ -17,6 +17,9 @@ app/android/
 app/ios/
 app/www/
 
+# ── 올릴 때마다 사전에서 새로 만드는 파일 (scripts/content.mjs recent) ──
+site/data/recent.json
+
 # ── Android 빌드 산출물 ───────────────────────────────────────
 .gradle/
 **/build/

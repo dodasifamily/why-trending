@@ -83,6 +83,15 @@ a { color: inherit; }
   font-size: 12px;
   font-weight: 600;
 }
+.gdot {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
 .note {
   margin: 20px 4px 0;
   font-size: 13px;
@@ -152,6 +161,23 @@ a { color: inherit; }
   font-size: 36px;
   line-height: 1.35;
 }
+.mycats { margin: 0 0 4px; }
+.mytop { display: flex; align-items: center; justify-content: space-between; }
+.mylabel { font-size: 13px; font-weight: 700; color: var(--muted); }
+.linkbtn {
+  min-height: 44px;
+  margin-right: -8px;
+  padding: 0 8px 0 16px;
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cobalt);
+}
+.mypills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+.pill.g { padding: 6px 12px; font-size: 13px; }
+.lh { margin: 22px 0 10px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.dayh { margin: 18px 0 8px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .cards { display: flex; flex-direction: column; gap: 12px; }
 .card {
   display: block;
@@ -298,16 +324,12 @@ a { color: inherit; }
   border-radius: 16px;
   overflow: hidden;
   color: #fff;
-  background: linear-gradient(135deg, var(--a1), var(--a2));
+  background: linear-gradient(135deg, var(--a1, #3347FF), var(--a2, #6F7DFF));
 }
 .art::before, .art::after { content: ""; position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.16); }
 .art::before { width: 190px; height: 190px; right: -50px; top: -84px; }
 .art::after { width: 120px; height: 120px; left: -34px; bottom: -66px; background: rgba(255, 255, 255, 0.11); }
 .art svg { position: relative; z-index: 1; stroke-width: 1.5; }
-.art-meme { --a1: #3347FF; --a2: #6F7DFF; }
-.art-culture { --a1: #7B3FF2; --a2: #B07BFF; }
-.art-sports { --a1: #0B8A5F; --a2: #2FC48D; }
-.art-biz { --a1: #F0A100; --a2: #FFD25E; color: var(--ink); }
 .sec { margin-top: 28px; }
 .sec h2 { margin: 0; font-size: 13px; font-weight: 700; color: var(--muted); }
 .sec p { margin: 8px 0 0; font-size: 15px; line-height: 1.65; }
@@ -377,7 +399,18 @@ a { color: inherit; }
   color: var(--ink);
 }
 .field input:focus-visible { outline: none; }
+.fchips {
+  display: flex;
+  gap: 8px;
+  margin: 12px -20px 0;
+  padding: 2px 20px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.fchips::-webkit-scrollbar { display: none; }
+.fchips .chip { flex: none; white-space: nowrap; }
 .tlist { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.dayh + .tlist { margin-top: 0; }
 .term {
   display: block;
   width: 100%;
@@ -390,8 +423,54 @@ a { color: inherit; }
 }
 .term .row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .term .nm { font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
-.term .tg { flex: none; font-size: 12px; color: var(--muted); }
+.term .tg { flex: none; display: inline-flex; align-items: center; font-size: 12px; color: var(--muted); }
 .term .ml { margin-top: 4px; font-size: 14px; line-height: 1.55; color: var(--body); }
+
+/* ---------- 분야 고르기 ---------- */
+.pickh { margin-top: 28px; line-height: 1.4; }
+.picklist { display: flex; flex-direction: column; gap: 8px; }
+.pickrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 68px;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  text-align: left;
+  color: var(--ink);
+}
+.pickrow[aria-pressed="true"] { border-color: var(--cobalt); background: #F4F6FF; box-shadow: inset 0 0 0 1px var(--cobalt); }
+.pico { flex: none; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; }
+.ptxt { flex: 1; min-width: 0; }
+.pl1 { display: block; font-size: 16px; font-weight: 700; }
+.pl2 { display: block; margin-top: 1px; font-size: 13px; line-height: 1.4; color: var(--muted); }
+.pcheck {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid #B9BFCE;
+  color: transparent;
+}
+.pickrow[aria-pressed="true"] .pcheck { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
+.pickbar {
+  position: sticky;
+  bottom: -28px; /* 화면(.view)의 아래 여백까지 덮어서 목록이 막대 아래로 비치지 않게 */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px -20px -28px;
+  padding: 22px 20px 16px;
+  background: linear-gradient(to top, var(--ground) 82%, rgba(242, 244, 248, 0));
+  box-shadow: 0 8px 0 var(--ground); /* 아래쪽 1픽셀 틈으로 목록이 비치지 않게 (화면 밖으로 나간 부분은 잘려요) */
+}
+.pickhint { margin: 0; text-align: center; font-size: 13px; font-weight: 600; color: var(--muted); }
 
 /* ---------- 알림 ---------- */
 .panel { padding: 12px 18px 18px; background: var(--card); border: 1px solid var(--line); border-radius: 20px; }

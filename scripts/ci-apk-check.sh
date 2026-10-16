@@ -62,6 +62,24 @@ else
   fail=1
 fi
 
+# 앱 안에 같이 넣는 해설 사본: 인터넷이 없거나 서버가 느릴 때 이 사본을 보여줘요.
+# (분야 목록 categories.json 이 없으면 처음 실행 때 '분야 고르기'를 못 보여주고, recent.json 이 없으면 '지난 며칠'이 비어요.)
+apk_list="$(unzip -l "$APK" 2>/dev/null || true)"
+if grep -q 'assets/public/index.html' <<<"$apk_list"; then
+  missing=""
+  for f in today terms categories recent; do
+    grep -q "assets/public/data/$f.json" <<<"$apk_list" || missing+=" $f.json"
+  done
+  if [ -z "$missing" ]; then
+    report+=$'\n'"✅ 앱 안 해설 사본: today · terms · categories · recent"
+  else
+    report+=$'\n'"❌ 앱 안 해설 사본이 빠졌어요:$missing"
+    fail=1
+  fi
+else
+  report+=$'\n'"⚠️ APK 안에서 웹 화면(assets/public)을 찾지 못해 해설 사본 점검을 건너뛰었어요"
+fi
+
 # 시험용 앱을 폰에서 덮어 설치하려면 빌드마다 서명 키가 같아야 해요. 같은 키인지 비교할 수 있게 지문을 적어 둬요.
 case "${KEY_CACHE_HIT:-}" in
   true) report+=$'\n'"🔑 서명 키: 저장해 둔 키를 불러왔어요" ;;

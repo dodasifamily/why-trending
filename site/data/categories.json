@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "groups": [
+    {
+      "id": "meme",
+      "label": "밈·신조어",
+      "hint": "요즘 유행하는 말과 밈, 화제의 영상",
+      "icon": "meme",
+      "a1": "#3347FF",
+      "a2": "#6F7DFF"
+    },
+    {
+      "id": "ent",
+      "label": "연예·음악",
+      "hint": "가수·아이돌·방송 속 화제",
+      "icon": "ent",
+      "a1": "#7B3FF2",
+      "a2": "#B07BFF"
+    },
+    {
+      "id": "screen",
+      "label": "드라마·영화·웹툰",
+      "hint": "화제가 된 작품과 장면",
+      "icon": "screen",
+      "a1": "#D6336C",
+      "a2": "#FF7AA8"
+    },
+    {
+      "id": "sports",
+      "label": "스포츠",
+      "hint": "경기와 선수 이야기",
+      "icon": "sports",
+      "a1": "#0B8A5F",
+      "a2": "#2FC48D"
+    },
+    {
+      "id": "game",
+      "label": "게임",
+      "hint": "게임 속 유행과 이슈",
+      "icon": "game",
+      "a1": "#E8590C",
+      "a2": "#FFA94D"
+    },
+    {
+      "id": "shop",
+      "label": "소비·먹거리",
+      "hint": "품절 대란, 신상, 핫플",
+      "icon": "shop",
+      "a1": "#F0A100",
+      "a2": "#FFD25E",
+      "ink": "#14161C"
+    },
+    {
+      "id": "tech",
+      "label": "IT·테크",
+      "hint": "앱·기기·AI 소식",
+      "icon": "tech",
+      "a1": "#243049",
+      "a2": "#5A6B91"
+    }
+  ]
+}

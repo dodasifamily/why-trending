@@ -32,12 +32,7 @@
   };
 
   // ---------- 상태 ----------
-  const GROUPS = [
-    { id: 'meme', label: '밈·신조어' },
-    { id: 'culture', label: '문화·연예' },
-    { id: 'sports', label: '스포츠' },
-    { id: 'biz', label: '경제·제품' }
-  ];
+  // 분야 목록(이름·색·아이콘)은 data/categories.json 하나만 기준이에요. 거기서 고치면 앱을 새로 만들지 않아도 바뀌어요.
   const HOURS = [7, 8, 9];
   const AI_NOTE = 'AI가 출처를 확인해 정리한 요약이에요. 틀릴 수 있으니 내용이 이상하면 해설 화면에서 알려주세요.';
 
@@ -47,7 +42,11 @@
     todayState: 'loading', // loading | ok | error
     termsState: 'idle', // idle | loading | ok | error
     q: '',
-    picks: Object.assign({ meme: true, culture: true, sports: true, biz: true }, store.get('picks', {})),
+    groups: null, // 분야 목록 (categories.json 의 groups)
+    groupsState: 'loading', // loading | ok | error
+    cats: cleanCats(store.get('cats', null)), // 내가 고른 분야 id 목록. null 이면 아직 고르지 않은 거예요(첫 실행)
+    recent: null, // 최근 7일 해설 (recent.json)
+    dictGroup: 'all', // 사전에서 보고 있는 분야 ('all' = 전체)
     alertOn: store.get('alertOn', false) === true,
     hour: HOURS.includes(store.get('hour', 8)) ? store.get('hour', 8) : 8,
     alertMsg: '',
@@ -55,6 +54,10 @@
     reportState: {},
     lastLoad: 0
   };
+
+  function cleanCats(v) {
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : null;
+  }
 
   // ---------- 작은 도구 ----------
   const $ = (sel, root) => (root || document).querySelector(sel);
@@ -95,10 +98,15 @@
     out: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path>',
     play: '<path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="none"></path>',
     // 분야별 그림 카드에 쓰는 큰 아이콘
+    // (이름은 categories.json 의 icon 과 같아요)
     meme: '<path d="M21 12a8 8 0 0 1-11.7 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"></path><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"></path>',
-    culture: '<path d="M9 18V6.5l10-2V16"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle>',
+    ent: '<path d="M9 18V6.5l10-2V16"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle>',
+    screen: '<rect x="3" y="4.5" width="18" height="12.5" rx="2.5"></rect><path d="M10.2 8.3v5.4l4.6-2.7z"></path><path d="M8 20.5h8M12 17v3.5"></path>',
     sports: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"></path><path d="M8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3"></path><path d="M12 13v4M9 20h6M10 17h4"></path>',
-    biz: '<path d="M5.5 8h13l1 12h-15z"></path><path d="M9 8V7a3 3 0 0 1 6 0v1"></path>'
+    game: '<path d="M7 7h10a4.5 4.5 0 0 1 4.4 5.4l-.8 4a2.6 2.6 0 0 1-4.6.9L14.6 15H9.4l-1.4 2.3a2.6 2.6 0 0 1-4.6-.9l-.8-4A4.5 4.5 0 0 1 7 7z"></path><path d="M8 10v3M6.5 11.5h3"></path><path d="M15.5 10.5h.01M17.5 12.5h.01"></path>',
+    shop: '<path d="M5.5 8h13l1 12h-15z"></path><path d="M9 8V7a3 3 0 0 1 6 0v1"></path>',
+    tech: '<rect x="7" y="7" width="10" height="10" rx="2"></rect><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"></path>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"></path>'
   };
   function icon(name, size) {
     const s = size || 18;
@@ -112,7 +120,7 @@
     el.setAttribute('stroke-linecap', 'round');
     el.setAttribute('stroke-linejoin', 'round');
     el.setAttribute('aria-hidden', 'true');
-    el.innerHTML = ICONS[name]; // 위에 적어 둔 고정 문자열만 쓰므로 안전해요
+    el.innerHTML = ICONS[name] || ICONS.meme; // 위에 적어 둔 고정 문자열만 쓰므로 안전해요 (모르는 이름이면 기본 그림)
     return el;
   }
 
@@ -172,6 +180,9 @@
   }
   const okToday = (j) => !!j && j.schema === 1 && Array.isArray(j.cards);
   const okTerms = (j) => !!j && j.schema === 1 && Array.isArray(j.terms);
+  const okRecent = (j) => !!j && j.schema === 1 && Array.isArray(j.cards);
+  const okGroups = (j) =>
+    !!j && j.schema === 1 && Array.isArray(j.groups) && j.groups.length > 0 && j.groups.every((g) => g && typeof g.id === 'string' && typeof g.label === 'string');
 
   /** 앱: 인터넷의 최신 파일 → 지난번에 받아 둔 파일 → 앱에 들어 있는 사본 순서. 웹: 같은 주소의 파일 */
   function loadFile(file, cacheKey, ok) {
@@ -195,24 +206,51 @@
       });
   }
 
-  function refreshToday(showLoading) {
+  /** 오늘 해설·분야 목록·최근 7일 해설을 한꺼번에 새로 받아요. 하나가 안 와도 나머지는 그대로 써요 */
+  function refreshData(showLoading) {
     if (showLoading && !S.today) {
       S.todayState = 'loading';
       route();
     }
-    return loadFile('today.json', 'cache.today', okToday)
-      .then((j) => {
-        S.today = j;
-        S.todayState = 'ok';
-        S.lastLoad = Date.now();
-      })
-      .catch(() => {
-        if (!S.today) S.todayState = 'error';
-      })
-      .then(() => {
-        const r = parseRoute().name;
-        if (r === 'today' || r === 'detail') route(true);
-      });
+    const hadGroups = !!S.groups;
+    const jobs = [
+      loadFile('today.json', 'cache.today', okToday)
+        .then((j) => {
+          S.today = j;
+          S.todayState = 'ok';
+          S.lastLoad = Date.now();
+        })
+        .catch(() => {
+          if (!S.today) S.todayState = 'error';
+        }),
+      loadFile('categories.json', 'cache.cats', okGroups)
+        .then((j) => {
+          S.groups = j.groups;
+          S.groupsState = 'ok';
+        })
+        .catch(() => {
+          if (!S.groups) S.groupsState = 'error'; // 분야를 못 받으면 분야 걸러내기 없이 전부 보여줘요
+        }),
+      loadFile('recent.json', 'cache.recent', okRecent)
+        .then((j) => {
+          S.recent = j;
+        })
+        .catch(() => {
+          /* 지난 며칠 목록만 안 보일 뿐이에요 */
+        })
+    ];
+    return Promise.all(jobs).then(() => {
+      const r = parseRoute().name;
+      if (hadGroups && view.querySelector('.pickrow')) return; // 분야를 고르는 중이에요
+      if (r === 'today' || r === 'detail') route(true);
+      // 분야 목록을 처음 받았을 때만 다시 그려요 (사전에서 글자를 치는 중이거나 분야를 고르는 중에 화면이 바뀌지 않게)
+      else if (!hadGroups && S.groups && (r === 'pick' || r === 'alerts' || (r === 'dict' && !isTypingQuery()))) route(true);
+    });
+  }
+
+  function isTypingQuery() {
+    const a = document.activeElement;
+    return !!(a && a.id === 'termq');
   }
 
   let termsPromise = null;
@@ -237,12 +275,81 @@
   function findCard(id) {
     const a = S.today && S.today.cards.find((c) => c.id === id);
     if (a) return a;
+    const b = S.recent && S.recent.cards.find((c) => c.id === id);
+    if (b) return b;
     return (S.terms && S.terms.terms.find((c) => c.id === id)) || null;
+  }
+
+  // ---------- 분야 ----------
+  const HEX = /^#[0-9A-Fa-f]{6}$/;
+  /** 분야 정보. 목록에 없는 분야여도 화면이 깨지지 않게 기본값을 줘요 */
+  function groupOf(id) {
+    const g = S.groups && S.groups.find((x) => x.id === id);
+    return g || { id: String(id || ''), label: '', hint: '', icon: 'meme' };
+  }
+  function groupColors(g) {
+    const ok = (v, d) => (typeof v === 'string' && HEX.test(v) ? v : d);
+    return { a1: ok(g.a1, '#3347FF'), a2: ok(g.a2, '#6F7DFF'), ink: ok(g.ink, '#FFFFFF') };
+  }
+  function groupIds() {
+    return S.groups ? S.groups.map((g) => g.id) : [];
+  }
+  /** 내가 고른 분야 (분야 목록에 없는 id 는 빼요). 아직 안 골랐으면 null */
+  function myCats() {
+    if (!S.groups || !S.cats) return null;
+    const ids = groupIds();
+    const mine = S.cats.filter((id) => ids.includes(id));
+    return mine.length ? mine : null;
+  }
+  function needsPick() {
+    return !!S.groups && !myCats();
+  }
+  /** 이 해설이 내 분야인지. 고르기 전이거나 분야 목록에 없는 분야면 숨기지 않아요 */
+  function isMine(c) {
+    const mine = myCats();
+    if (!mine || !groupIds().includes(c.group)) return true;
+    return mine.includes(c.group);
+  }
+  function saveCats(ids) {
+    const order = groupIds();
+    S.cats = order.filter((id) => ids.includes(id));
+    store.set('cats', S.cats);
+    onCatsChanged();
+  }
+  function onCatsChanged() {
+    /* 분야별 맞춤 알림(2단계)을 붙일 때 여기서 알림 구독을 바꿔요 */
+  }
+  /** '드라마·영화·웹툰' 처럼 가운뎃점이 든 이름은 점 뒤에서만 줄이 바뀌게 해요 */
+  function labelNodes(label) {
+    const out = [];
+    String(label)
+      .split('·')
+      .forEach((part, i) => {
+        if (i) out.push('·', h('wbr'));
+        out.push(part);
+      });
+    return out;
+  }
+  /** 분야 색 점 + 글자 */
+  function gdot(groupId) {
+    return h('i', { class: 'gdot', style: `background:${groupColors(groupOf(groupId)).a1}` });
   }
 
   function visibleCards() {
     const list = (S.today && S.today.cards) || [];
-    return list.filter((c) => !c.group || S.picks[c.group] !== false);
+    return list.filter(isMine);
+  }
+
+  /** '지난 며칠': 오늘 해설보다 앞선 날짜의 내 분야 해설을 날짜별로 묶어서 (최신 날짜 먼저) */
+  function pastDays() {
+    if (!S.today || !S.recent) return [];
+    const byDate = new Map();
+    for (const c of S.recent.cards) {
+      if (!c || !(c.date < S.today.date) || !isMine(c)) continue;
+      if (!byDate.has(c.date)) byDate.set(c.date, []);
+      byDate.get(c.date).push(c);
+    }
+    return [...byDate.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([date, cards]) => ({ date, cards }));
   }
 
   // ---------- 길 찾기(라우터) ----------
@@ -251,6 +358,7 @@
     if (parts[0] === 't' && parts[1]) return { name: 'detail', id: decodeURIComponent(parts[1]) };
     if (parts[0] === 'dict') return { name: 'dict' };
     if (parts[0] === 'alerts') return { name: 'alerts' };
+    if (parts[0] === 'pick') return { name: 'pick' };
     return { name: 'today' };
   }
   function go(path, replace) {
@@ -266,7 +374,7 @@
   }
 
   function updateTabs(r) {
-    const active = r.name === 'detail' ? 'today' : r.name;
+    const active = r.name === 'detail' || r.name === 'pick' ? 'today' : r.name;
     document.querySelectorAll('.tab').forEach((b) => {
       if (b.dataset.tab === active) b.setAttribute('aria-current', 'page');
       else b.removeAttribute('aria-current');
@@ -279,6 +387,7 @@
     if (r.name === 'today') renderToday(keepScroll);
     else if (r.name === 'detail') renderDetail(r.id, keepScroll);
     else if (r.name === 'dict') renderDict();
+    else if (r.name === 'pick') renderPicker(false);
     else renderAlerts();
     if (!keepScroll) {
       try {
@@ -303,43 +412,178 @@
     return h('div', { class: 'box', role: 'alert' }, h('h2', null, title), h('p', null, text), onRetry && h('button', { class: 'btn primary', type: 'button', onclick: onRetry }, '다시 시도'));
   }
 
+  function catPill(c) {
+    return h('span', { class: 'pill' }, gdot(c.group), c.cat);
+  }
+
   function cardButton(c) {
     return h(
       'button',
       { class: 'card', type: 'button', onclick: () => go('/t/' + encodeURIComponent(c.id)) },
-      h('span', { class: 'pill' }, c.cat),
+      catPill(c),
       h('span', { class: 'kw' }, h('span', { class: 'hl' }, c.keyword)),
       h('span', { class: 'ln' }, c.line),
       h('span', { class: 'more' }, h('span', null, '왜 뜨지? 보기'), icon('right'))
     );
   }
 
+  /** 목록용 작은 카드 (사전, 지난 며칠) */
+  function termRow(c) {
+    return h(
+      'button',
+      { class: 'term', type: 'button', onclick: () => go('/t/' + encodeURIComponent(c.id)) },
+      h('span', { class: 'row' }, h('span', { class: 'nm' }, c.keyword), h('span', { class: 'tg' }, gdot(c.group), c.cat)),
+      h('span', { class: 'ml', style: 'display:block' }, c.line)
+    );
+  }
+
+  function myCatsRow() {
+    const mine = myCats();
+    if (!mine) return null;
+    const all = mine.length === S.groups.length;
+    const pills = all
+      ? [h('span', { class: 'pill g' }, '모든 분야')]
+      : mine.map((id) => h('span', { class: 'pill g' }, gdot(id), labelNodes(groupOf(id).label)));
+    return h(
+      'div',
+      { class: 'mycats' },
+      h('div', { class: 'mytop' }, h('span', { class: 'mylabel' }, '내 분야'), h('button', { class: 'linkbtn', type: 'button', 'aria-label': '내 분야 바꾸기', onclick: () => go('/pick') }, '바꾸기')),
+      h('div', { class: 'mypills' }, pills)
+    );
+  }
+
   function renderToday(keepScroll) {
     document.title = '왜뜨지? – 요즘 뜨는 말, 30초 해설';
+    if (S.today && needsPick()) return renderPicker(true); // 처음 실행하면 관심 분야부터 골라요
     const nodes = [brandRow(S.today ? koDate(S.today.date) : ''), h('h1', { class: 'hero' }, '요즘 뜨는 말,', h('br'), h('span', { class: 'hl' }, '30초 해설'))];
 
     if (!S.today) {
-      if (S.todayState === 'error') nodes.push(errorBox('해설을 불러오지 못했어요', '인터넷 연결을 확인하고 다시 시도해 주세요.', () => refreshToday(true)));
+      if (S.todayState === 'error') nodes.push(errorBox('해설을 불러오지 못했어요', '인터넷 연결을 확인하고 다시 시도해 주세요.', () => refreshData(true)));
       else nodes.push(h('p', { class: 'note', role: 'status' }, '해설을 불러오고 있어요…'));
+    } else if (S.groupsState === 'loading' && !S.groups) {
+      // 분야 목록이 와야 '내 분야'를 걸러낼 수 있어요. 잠깐이라 안내만 보여줘요 (못 받으면 전부 보여줘요)
+      nodes.push(h('p', { class: 'note', role: 'status' }, '해설을 불러오고 있어요…'));
     } else {
       const cards = visibleCards();
+      const past = pastDays();
       if (daysApart(S.today.date, localYmd()) >= 2) nodes.push(h('p', { class: 'stale', role: 'status' }, '업데이트가 조금 늦어지고 있어요. 지난 해설을 보여드려요.'));
+      nodes.push(myCatsRow());
       if (cards.length) {
+        nodes.push(h('h2', { class: 'lh' }, daysApart(S.today.date, localYmd()) <= 1 ? '오늘' : '가장 최근'));
         nodes.push(h('div', { class: 'cards' }, cards.map(cardButton)));
       } else {
         nodes.push(
           h(
             'div',
             { class: 'box' },
-            h('h2', null, '고른 분야의 해설이 아직 없어요'),
-            h('p', null, '알림 탭에서 받아볼 분야를 바꿔 보세요.'),
-            h('button', { class: 'btn ghost', type: 'button', onclick: () => go('/alerts') }, '분야 바꾸기')
+            h('h2', null, '오늘은 내 분야의 새 해설이 없어요'),
+            h('p', null, past.length ? '아래에서 지난 며칠 동안 올라온 해설을 볼 수 있어요.' : '새 해설이 올라오면 여기에 보여요. 분야를 바꾸면 다른 해설도 볼 수 있어요.'),
+            h('button', { class: 'btn ghost', type: 'button', onclick: () => go('/pick') }, '분야 바꾸기')
           )
         );
+      }
+      if (past.length) {
+        nodes.push(h('h2', { class: 'lh' }, '지난 며칠'));
+        past.forEach((day) => {
+          nodes.push(h('h3', { class: 'dayh' }, koDate(day.date)), h('div', { class: 'tlist' }, day.cards.map(termRow)));
+        });
       }
       nodes.push(h('p', { class: 'note' }, AI_NOTE));
     }
     setView(nodes, keepScroll);
+  }
+
+  // ---------- 관심 분야 고르기 ----------
+  // first=true: 처음 실행했을 때 오늘 화면 자리에서 보여줘요. false: '바꾸기'를 눌러 들어온 화면(#/pick)
+  function renderPicker(first) {
+    document.title = first ? '왜뜨지? – 관심 분야 고르기' : '내 분야 – 왜뜨지?';
+    if (!S.groups) {
+      setView([
+        h('div', { class: 'topbar' }, h('button', { class: 'back', type: 'button', onclick: backToList }, icon('left', 22), '뒤로')),
+        S.groupsState === 'loading'
+          ? h('p', { class: 'note', role: 'status' }, '분야 목록을 불러오고 있어요…')
+          : errorBox('분야 목록을 불러오지 못했어요', '인터넷 연결을 확인하고 다시 시도해 주세요.', () => refreshData(true).then(() => route()))
+      ]);
+      return;
+    }
+    const groups = S.groups;
+    const chosen = new Set(myCats() || (first ? [] : groups.map((g) => g.id)));
+
+    const rows = groups.map((g) => {
+      const col = groupColors(g);
+      const btn = h(
+        'button',
+        {
+          class: 'pickrow',
+          type: 'button',
+          'data-group': g.id,
+          'aria-pressed': chosen.has(g.id) ? 'true' : 'false',
+          onclick: () => {
+            if (chosen.has(g.id)) chosen.delete(g.id);
+            else chosen.add(g.id);
+            btn.setAttribute('aria-pressed', chosen.has(g.id) ? 'true' : 'false');
+            sync();
+          }
+        },
+        h('span', { class: 'pico', style: `background:linear-gradient(135deg,${col.a1},${col.a2});color:${col.ink}`, 'aria-hidden': 'true' }, icon(g.icon, 24)),
+        h('span', { class: 'ptxt' }, h('span', { class: 'pl1' }, labelNodes(g.label)), h('span', { class: 'pl2' }, g.hint)),
+        h('span', { class: 'pcheck', 'aria-hidden': 'true' }, icon('check', 16))
+      );
+      return btn;
+    });
+
+    const finish = () => {
+      if (first) renderToday(false);
+      else {
+        toast('내 분야를 저장했어요');
+        backToList();
+      }
+    };
+    const hint = h('p', { class: 'pickhint', role: 'status' });
+    const save = h(
+      'button',
+      {
+        class: 'btn primary',
+        type: 'button',
+        onclick: () => {
+          if (!chosen.size) return;
+          saveCats([...chosen]);
+          finish();
+        }
+      },
+      first ? '시작하기' : '저장'
+    );
+    const allBtn = h('button', {
+      class: 'linkbtn',
+      type: 'button',
+      onclick: () => {
+        const everything = chosen.size === groups.length;
+        chosen.clear();
+        if (!everything) groups.forEach((g) => chosen.add(g.id));
+        rows.forEach((r) => r.setAttribute('aria-pressed', chosen.has(r.getAttribute('data-group')) ? 'true' : 'false'));
+        sync();
+      }
+    });
+    function sync() {
+      const n = chosen.size;
+      save.disabled = n === 0;
+      hint.textContent = n === 0 ? '하나 이상 골라 주세요' : n === groups.length ? '모든 분야를 볼게요' : `${n}개 분야를 골랐어요`;
+      allBtn.textContent = n === groups.length ? '전체 해제' : '전체 선택';
+    }
+    sync();
+
+    const head = first
+      ? [brandRow(''), h('h1', { class: 'h2big pickh' }, '어떤 얘기가 궁금하세요?'), h('p', { class: 'sub' }, '관심 있는 분야를 고르면 그 분야의 새 이슈를 먼저 보여드려요. 나중에 언제든 바꿀 수 있어요.')]
+      : [h('div', { class: 'topbar' }, h('button', { class: 'back', type: 'button', onclick: backToList }, icon('left', 22), '뒤로')), h('h1', { class: 'h2big' }, '내 분야'), h('p', { class: 'sub' }, '고른 분야의 이슈만 오늘 화면에 보여드려요.')];
+    setView(
+      [
+        head,
+        h('div', { class: 'mytop' }, h('span', { class: 'mylabel' }, '여러 개 골라도 돼요'), allBtn),
+        h('div', { class: 'picklist', role: 'group', 'aria-label': '관심 분야' }, rows),
+        h('div', { class: 'pickbar' }, hint, save)
+      ],
+      false
+    );
   }
 
   // ---------- 해설 ----------
@@ -416,7 +660,6 @@
   // 재생으로 보여주고, 영상이 없는 해설에는 분야별 그림 카드를 보여줘요.
   // 데이터에서 온 값은 믿지 않고, 영상 주소는 11글자 번호로 우리가 직접 만들어요.
   const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
-  const ART_GROUPS = ['meme', 'culture', 'sports', 'biz'];
 
   function videoOf(c) {
     const list = Array.isArray(c.media) ? c.media : [];
@@ -443,8 +686,9 @@
   }
 
   function artBlock(c) {
-    const g = ART_GROUPS.includes(c.group) ? c.group : 'meme';
-    return h('div', { class: `art art-${g}`, 'aria-hidden': 'true' }, icon(g, 64));
+    const g = groupOf(c.group);
+    const col = groupColors(g);
+    return h('div', { class: 'art', style: `--a1:${col.a1};--a2:${col.a2};color:${col.ink}`, 'aria-hidden': 'true' }, icon(g.icon, 64));
   }
 
   // ----- 영상 재생 (웹·앱 모두 그 자리에서 재생해요) -----
@@ -632,7 +876,7 @@
         h('button', { class: 'back', type: 'button', onclick: backToList }, icon('left', 22), '뒤로'),
         h('button', { class: 'iconbtn', type: 'button', 'aria-label': '공유', onclick: () => shareCard(c) }, icon('share', 22))
       ),
-      h('span', { class: 'pill' }, c.cat),
+      catPill(c),
       h('h1', { class: 'dh1' }, h('span', { class: 'hl' }, c.keyword)),
       h('p', { class: 'dline' }, c.line),
       mediaBlock(c),
@@ -688,25 +932,38 @@
         return;
       }
       const needle = S.q.trim().toLowerCase();
-      const hits = S.terms.terms.filter((c) => matchTerm(c, needle));
-      hits.forEach((c) =>
-        list.appendChild(
+      const only = S.groups && S.dictGroup !== 'all' && groupIds().includes(S.dictGroup) ? S.dictGroup : 'all';
+      const hits = S.terms.terms.filter((c) => (only === 'all' || c.group === only) && matchTerm(c, needle));
+      hits.forEach((c) => list.appendChild(termRow(c)));
+      if (!hits.length) empty.textContent = needle ? '검색 결과가 없어요. 다른 말로 찾아보세요.' : only !== 'all' ? '이 분야는 아직 해설한 말이 없어요.' : '아직 해설한 말이 없어요.';
+    }
+
+    const filterBtns = S.groups
+      ? [{ id: 'all', label: '전체' }, ...S.groups].map((g) =>
           h(
             'button',
-            { class: 'term', type: 'button', onclick: () => go('/t/' + encodeURIComponent(c.id)) },
-            h('span', { class: 'row' }, h('span', { class: 'nm' }, c.keyword), h('span', { class: 'tg' }, c.cat)),
-            h('span', { class: 'ml', style: 'display:block' }, c.line)
+            {
+              class: 'chip',
+              type: 'button',
+              'data-group': g.id,
+              'aria-pressed': S.dictGroup === g.id ? 'true' : 'false',
+              onclick: () => {
+                S.dictGroup = g.id;
+                filterBtns.forEach((b) => b.setAttribute('aria-pressed', b.getAttribute('data-group') === g.id ? 'true' : 'false'));
+                drawList();
+              }
+            },
+            g.id === 'all' ? g.label : labelNodes(g.label)
           )
         )
-      );
-      if (!hits.length) empty.textContent = needle ? '검색 결과가 없어요. 다른 말로 찾아보세요.' : '아직 해설한 말이 없어요.';
-    }
+      : [];
 
     setView([
       h('h1', { class: 'h2big' }, '사전'),
       h('p', { class: 'sub' }, '지금까지 해설한 말을 모아뒀어요'),
       h('label', { for: 'termq', style: 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap' }, '모르는 말 검색'),
       h('div', { class: 'field' }, icon('search', 20), input),
+      filterBtns.length ? h('div', { class: 'fchips', role: 'group', 'aria-label': '분야로 걸러 보기' }, filterBtns) : null,
       list,
       empty
     ]);
@@ -804,22 +1061,12 @@
       )
     );
 
-    const groupChips = GROUPS.map((g) =>
-      h(
-        'button',
-        {
-          class: 'chip',
-          type: 'button',
-          'aria-pressed': S.picks[g.id] ? 'true' : 'false',
-          onclick: () => {
-            S.picks[g.id] = !S.picks[g.id];
-            store.set('picks', S.picks);
-            renderAlerts();
-          }
-        },
-        g.label
-      )
-    );
+    const mine = myCats();
+    const myPills = mine
+      ? mine.length === S.groups.length
+        ? [h('span', { class: 'pill g' }, '모든 분야')]
+        : mine.map((id) => h('span', { class: 'pill g' }, gdot(id), labelNodes(groupOf(id).label)))
+      : [];
 
     setView(
       [
@@ -829,9 +1076,10 @@
         h(
           'div',
           { class: 'panel' },
-          h('div', { class: 'ptitle' }, '보고 싶은 분야'),
-          h('div', { class: 'chips', style: 'margin-top:12px' }, groupChips),
-          h('div', { class: 'info' }, icon('info', 16), h('span', null, '고른 분야만 오늘 화면에 보여요. 정치, 사건사고, 실명 의혹은 다루지 않아요.'))
+          h('div', { class: 'ptitle' }, '내 분야'),
+          myPills.length ? h('div', { class: 'mypills', style: 'margin-top:12px' }, myPills) : h('p', { class: 'sub', style: 'margin:8px 0 0' }, S.groups ? '아직 고르지 않았어요.' : '분야 목록을 불러오지 못했어요.'),
+          S.groups ? h('button', { class: 'btn ghost', type: 'button', style: 'margin-top:14px', onclick: () => go('/pick') }, '분야 바꾸기') : null,
+          h('div', { class: 'info' }, icon('info', 16), h('span', null, '고른 분야의 이슈만 오늘 화면에 보여요. 정치, 사건사고, 실명 의혹은 다루지 않아요.'))
         ),
         h('div', { class: 'info' }, icon('info', 16), h('span', null, AI_NOTE)),
         h('p', { class: 'legal' }, h('a', { href: 'privacy.html' }, '개인정보처리방침'))
@@ -872,7 +1120,7 @@
     if (App && App.addListener) {
       App.addListener('backButton', () => {
         const r = parseRoute();
-        if (r.name === 'detail') backToList();
+        if (r.name === 'detail' || r.name === 'pick') backToList();
         else if (r.name !== 'today') go('/', true);
         else if (App.exitApp) App.exitApp();
       });
@@ -891,7 +1139,7 @@
       route();
     });
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && Date.now() - S.lastLoad > 30 * 60 * 1000) refreshToday(false);
+      if (document.visibilityState === 'visible' && Date.now() - S.lastLoad > 30 * 60 * 1000) refreshData(false);
     });
 
     const cached = store.get('cache.today', null);
@@ -899,8 +1147,15 @@
       S.today = cached;
       S.todayState = 'ok';
     }
+    const cachedGroups = store.get('cache.cats', null);
+    if (okGroups(cachedGroups)) {
+      S.groups = cachedGroups.groups;
+      S.groupsState = 'ok';
+    }
+    const cachedRecent = store.get('cache.recent', null);
+    if (okRecent(cachedRecent)) S.recent = cachedRecent;
     route();
-    refreshToday(false);
+    refreshData(false);
     initNative();
   }
 
