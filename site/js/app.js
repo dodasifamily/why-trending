@@ -713,10 +713,69 @@
     next();
   }
 
+  // ----- 장면 그림 (scene) -----
+  // 영상이 없는 해설에는 이모지로 만든 '한 장면'을 분야별 그림 카드 위에 보여줘요. 사진·짤·캡처는 출처를 달아도 저작권 문제가 있어서
+  // 쓰지 않고, 우리가 고른 이모지로 뜻을 바로 떠올리게 해요. 데이터에서 온 값은 믿지 않고, 이모지 한 개 또는 영문·숫자 1~3자인 칸만
+  // 2~4개(이모지 1개 이상) 받아요. 하나라도 어긋나면 장면 없이 그림 카드만 보여줘요.
+  const SCENE_EMOJI = /^\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic}️?)*$/u;
+  const SCENE_CHIP = /^[A-Za-z0-9?!]{1,3}$/;
+
+  function sceneOf(c) {
+    const list = Array.isArray(c.scene) ? c.scene : null;
+    if (!list || list.length < 2 || list.length > 4) return null;
+    if (!list.every((x) => typeof x === 'string' && (SCENE_EMOJI.test(x) || SCENE_CHIP.test(x)))) return null;
+    return list.some((x) => SCENE_EMOJI.test(x)) ? list : null;
+  }
+
   function artBlock(c) {
     const g = groupOf(c.group);
     const col = groupColors(g);
-    return h('div', { class: 'art', style: `--a1:${col.a1};--a2:${col.a2};color:${col.ink}`, 'aria-hidden': 'true' }, icon(g.icon, 64));
+    const style = `--a1:${col.a1};--a2:${col.a2};color:${col.ink}`;
+    const scene = sceneOf(c);
+    if (!scene) return h('div', { class: 'art', style, 'aria-hidden': 'true' }, icon(g.icon, 64));
+    const cells = [];
+    scene.forEach((x, i) => {
+      if (i) cells.push(h('span', { class: 'ar', 'aria-hidden': 'true' }, '→'));
+      cells.push(h('span', { class: SCENE_EMOJI.test(x) ? 'se' : 'sc' }, x));
+    });
+    return h('div', { class: 'art scene', style, role: 'img', 'aria-label': `장면: ${c.line}` }, h('div', { class: 'strip' }, cells));
+  }
+
+  /** "A: …\nB: …" 모양의 예시를 대화 말풍선으로 바꿔요. 모양이 다르면 null (원래 글 그대로 보여줘요) */
+  function chatOf(example) {
+    const lines = String(example || '')
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!lines.length || lines.length > 6) return null;
+    const out = [];
+    for (const ln of lines) {
+      const m = /^([AB])\s*[:：]\s*(.+)$/.exec(ln);
+      if (!m) return null;
+      out.push({ who: m[1], text: m[2] });
+    }
+    return out;
+  }
+
+  function exampleBlock(c) {
+    const chat = chatOf(c.example);
+    if (!chat) return h('div', { class: 'bubble' }, c.example);
+    return h(
+      'div',
+      { class: 'chat', role: 'group', 'aria-label': '대화 예시' },
+      chat.map((m) => h('div', { class: 'msg ' + (m.who === 'A' ? 'a' : 'b') }, h('span', { class: 'who' }, m.who), h('p', { class: 'tx' }, m.text)))
+    );
+  }
+
+  /** 영상·이미지를 직접 보고 싶을 때를 위한 바깥 검색 링크예요. 사진·짤을 우리가 가져다 쓰지 않고, 사용자가 검색 서비스에서 직접 찾게 해요. */
+  function findBlock(c) {
+    const q = encodeURIComponent(String(c.keyword) + (c.group === 'meme' ? ' 밈' : ''));
+    const link = (href, label) => h('a', { class: 'btn ghost', href, target: '_blank', rel: 'noopener noreferrer' }, label, icon('out', 14));
+    return section(
+      '더 찾아보기',
+      h('div', { class: 'finds' }, link(`https://www.youtube.com/results?search_query=${q}`, '유튜브에서 찾기'), link(`https://www.google.com/search?tbm=isch&safe=active&q=${q}`, '이미지로 찾기')),
+      h('p', { class: 'note', style: 'margin:8px 4px 0' }, '바깥 서비스의 검색 결과예요. 거기에 보이는 영상·이미지는 왜뜨지?와 관계없어요.')
+    );
   }
 
   // ----- 영상 재생 (웹·앱 모두 그 자리에서 재생해요) -----
@@ -911,7 +970,8 @@
       section('뜻', h('p', null, c.meaning)),
       section('왜 뜨지?', c.why.map((t, i) => h('div', { class: 'why' }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 't' }, t))))
     ];
-    if (c.example) nodes.push(section('이렇게 써요 (예시)', h('div', { class: 'bubble' }, c.example)));
+    if (c.example) nodes.push(section('이렇게 써요 (예시)', exampleBlock(c)));
+    nodes.push(findBlock(c));
     nodes.push(section('출처', sourceList(c), h('p', { class: 'note', style: 'margin:10px 4px 0' }, AI_NOTE)));
     nodes.push(h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', onclick: () => shareCard(c) }, '친구에게 공유하기'), reportArea(c)));
     setView(nodes, keepScroll);

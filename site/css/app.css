@@ -349,6 +349,37 @@ a { color: inherit; }
 .art::before { width: 190px; height: 190px; right: -50px; top: -84px; }
 .art::after { width: 120px; height: 120px; left: -34px; bottom: -66px; background: rgba(255, 255, 255, 0.11); }
 .art svg { position: relative; z-index: 1; stroke-width: 1.5; }
+/* 장면 그림: 영상이 없을 때 이모지로 만든 한 장면 (칸 사이에는 화살표) */
+.art.scene { height: 132px; }
+.art .strip {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0 12px;
+  font-size: clamp(28px, 10.5vw, 44px);
+  line-height: 1;
+  white-space: nowrap;
+}
+.art .se { font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; }
+.art .sc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1em;
+  height: 1.1em;
+  padding: 0 0.18em;
+  border-radius: 0.3em;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--a1, #3347FF);
+  font-size: 0.62em;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.art .ar { font-size: 0.42em; font-weight: 700; opacity: 0.85; }
 .sec { margin-top: 28px; }
 .sec h2 { margin: 0; font-size: 13px; font-weight: 700; color: var(--muted); }
 .sec p { margin: 8px 0 0; font-size: 15px; line-height: 1.65; }
@@ -378,6 +409,37 @@ a { color: inherit; }
   line-height: 1.7;
   white-space: pre-line;
 }
+/* 예시를 대화 말풍선으로 (A 는 왼쪽, B 는 오른쪽) */
+.chat { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.msg { display: flex; align-items: flex-end; gap: 8px; max-width: 90%; }
+.msg.b { align-self: flex-end; flex-direction: row-reverse; }
+.msg .who {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.msg .tx {
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px 16px 16px 4px;
+  font-size: 15px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.msg.b .tx { background: var(--cobalt); border-color: var(--cobalt); border-radius: 16px 16px 4px 16px; color: #fff; }
+/* 영상·이미지 찾아보기(바깥 검색 링크) */
+.finds { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.finds .btn { width: auto; flex: 1 1 140px; min-height: 48px; font-size: 14px; text-decoration: none; }
 .srcs { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .srcs a {
   display: block;

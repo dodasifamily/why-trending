@@ -190,6 +190,25 @@ function validateCard(card, where) {
   if (Array.isArray(card.why)) card.why.forEach((w, i) => typeof w === 'string' && scanBlocked(where, `why[${i}]`, w));
 
   validateMedia(card, where);
+  validateScene(card, where);
+}
+
+// scene 은 선택 항목이에요. 영상이 없는 해설에 앱이 '이모지로 만든 한 장면'을 분야별 그림 카드 위에 보여줘요.
+// 사진·짤·캡처는 출처를 달아도 저작권 문제가 있어서 쓰지 않고, 우리가 직접 고른 이모지로 뜻을 바로 떠올리게 하려는 거예요.
+// 형식: "scene": ["🎮", "😝", "L", "🏳️"]  (2~4칸, 칸마다 이모지 한 개이거나 영문·숫자 1~3자. 이모지는 1개 이상)
+const SCENE_EMOJI = /^\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic}️?)*$/u;
+const SCENE_CHIP = /^[A-Za-z0-9?!]{1,3}$/;
+function validateScene(card, where) {
+  if (card.scene === undefined) return;
+  if (!Array.isArray(card.scene) || card.scene.length < 2 || card.scene.length > 4) {
+    return err(where, 'scene 은 2~4칸짜리 목록이어야 해요 (장면이 없으면 scene 항목 자체를 빼세요)');
+  }
+  card.scene.forEach((x, i) => {
+    if (typeof x !== 'string' || !(SCENE_EMOJI.test(x) || SCENE_CHIP.test(x))) {
+      err(`${where}.scene[${i}]`, '칸마다 이모지 한 개이거나 영문·숫자 1~3자여야 해요');
+    }
+  });
+  if (!card.scene.some((x) => typeof x === 'string' && SCENE_EMOJI.test(x))) err(where, 'scene 에는 이모지가 1개 이상 있어야 해요');
 }
 
 // media 는 선택 항목이에요. 없으면 앱이 분야별 그림 카드를 대신 보여줘요.
