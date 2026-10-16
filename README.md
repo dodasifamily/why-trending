@@ -38,6 +38,7 @@
   - `GOOGLE_SERVICES_JSON`: Firebase 콘솔에서 안드로이드 앱(패키지 이름 `io.github.dodasifamily.issuewhy`)을 등록하고 받은 `google-services.json` 의 내용 전체. 앱을 만들 때(`android.yml` → `app/scripts/prepare-fcm.mjs`) 써요. 패키지 이름이 다르면 빌드가 이유를 알려 주며 멈춰요.
   - `FCM_SERVICE_ACCOUNT_JSON`: Firebase 프로젝트 설정 → 서비스 계정 → '새 비공개 키 생성'으로 받은 JSON 의 내용 전체. 알림을 보낼 때(`push.yml`) 써요. **비밀 키예요.** 채팅·이슈·저장소에 올리지 말고 Secrets 에만 넣어요.
 - 직접 해 보기: Actions 탭 → '분야별 알림 보내기' → Run workflow. 처음에는 '보내지 않고 내용만 보기'를 `true` 로 두고 로그에서 보낼 내용을 확인해요.
+- 시험 보내기(저장소 안에서): `ops/push-now.json` 을 만들거나 바꾼 커밋을 main 에 올리면 `push.yml` 이 그 파일대로 보내요. 예: `{"hours": [8], "dry_run": false}` → 8시를 고른 기기에 진짜로 보내요. `dry_run` 을 `false` 로 분명히 적지 않으면 보내지 않고 내용만 보여줘요(결과는 Actions 실행 화면의 '알림'에 나와요). 파일을 지우는 커밋은 아무것도 보내지 않아요.
 - 개인정보: 알림을 켜면 Google(Firebase Cloud Messaging)이 기기의 알림 등록 값·설치 ID·IP 등을 처리해요. 운영자는 이 값을 받지 않아요. 개인정보처리방침 6번에 적어 두었어요. 구글 플레이 '데이터 보안' 양식에는 '기기 또는 기타 ID'(앱 기능 목적, 알림을 켠 경우에만)를 적어야 해요. 양식을 쓸 때 구글 안내를 다시 확인해요.
 
 ### 사진·영상 (`media`)

@@ -4,6 +4,8 @@ name: 분야별 알림 보내기 (FCM)
 #  - 오늘 해설이 올라오지 않았으면 보내지 않아요 (지난 해설로 '새 해설' 알림을 보내지 않아요).
 #  - Firebase 서비스 계정 키(FCM_SERVICE_ACCOUNT_JSON)가 GitHub Secrets 에 등록되기 전에는 아무것도 하지 않고 끝나요.
 #  - 직접 해 보려면 Actions 탭에서 '알림 보내기'를 눌러요 (받는 시각을 고르고, 처음에는 '보내지 않고 내용만 보기' 로 확인해요).
+#  - 시험 보내기: ops/push-now.json 을 바꾼 커밋이 main 에 올라오면 그 파일에 적힌 대로 보내요 (예: {"hours":[8], "dry_run": false}).
+#    dry_run 을 false 로 분명히 적지 않으면 보내지 않고 내용만 보여줘요. 저장소에 쓰기 권한이 있는 사람만 올릴 수 있어요.
 # 보내는 방법과 규칙은 scripts/push.mjs 에 있어요.
 
 on:
@@ -12,6 +14,10 @@ on:
     - cron: '7 22 * * *'   # 한국 시간 07:07
     - cron: '7 23 * * *'   # 한국 시간 08:07
     - cron: '7 0 * * *'    # 한국 시간 09:07
+  push:
+    branches: [main]
+    paths:
+      - 'ops/push-now.json'
   workflow_dispatch:
     inputs:
       hour:
@@ -50,6 +56,8 @@ jobs:
           # 예약 실행은 어느 시각 알림인지 예약 시각으로 정해요 (07:07 → 7, 08:07 → 8, 09:07 → 9)
           HOUR: ${{ github.event_name == 'workflow_dispatch' && inputs.hour || github.event.schedule == '7 22 * * *' && '7' || github.event.schedule == '7 23 * * *' && '8' || '9' }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
-          # 예약 실행은 해설 갱신이 조금 늦어도 기다려요 (최대 25분). 직접 누른 실행은 기다리지 않아요.
-          WAIT_MIN: ${{ github.event_name == 'workflow_dispatch' && '0' || '25' }}
+          # 예약 실행은 해설 갱신이 조금 늦어도 기다려요 (최대 25분). 직접 누른 실행·시험 보내기는 기다리지 않아요.
+          WAIT_MIN: ${{ github.event_name == 'schedule' && '25' || '0' }}
+          # 시험 보내기(파일을 올린 커밋)일 때는 이 파일이 시각·보낼지 여부를 정해요
+          PUSH_FILE: ${{ github.event_name == 'push' && 'ops/push-now.json' || '' }}
         run: node scripts/push.mjs

@@ -8,6 +8,8 @@
 //   HOUR      받는 시각(7·8·9). --hour 로도 줄 수 있어요.
 //   DRY_RUN   1 또는 true 면 보내지 않고 보낼 내용만 보여줘요. (키가 없어도 돼요)
 //   WAIT_MIN  오늘 해설이 올라오길 기다리는 최대 분. 기본 0.
+//   PUSH_FILE 시험 보내기 파일 경로(ops/push-now.json). 이 파일이 있으면 HOUR·DRY_RUN·WAIT_MIN 대신 파일 내용대로 해요.
+//             {"hours":[8], "dry_run": false} — dry_run 을 false 로 분명히 적었을 때만 진짜로 보내요.
 //
 // 하는 일
 //   1) 오늘(한국 시간) 해설이 main 에 올라올 때까지 기다려요 (git fetch 로 origin/main 의 today.json 을 봐요)
@@ -42,6 +44,10 @@ function notice(title, msg) {
 }
 function warning(title, msg) {
   console.log(`::warning title=${esc(title)}::${esc(msg)}`);
+}
+// 실패 이유가 GitHub 의 '알림'으로도 남아요 (전체 로그를 열지 않아도 보여요). 비밀 값은 넣지 않아요.
+function failure(title, msg) {
+  console.log(`::error title=${esc(title)}::${esc(msg)}`);
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -220,13 +226,28 @@ function parseArgs(argv) {
   return a;
 }
 
-export async function main({ argv = process.argv.slice(2), env = process.env, fetchImpl = fetch, wait = sleep, now = Date.now, readLocal, readRemote } = {}) {
+export async function main({ argv = process.argv.slice(2), env = process.env, fetchImpl = fetch, wait = sleep, now = Date.now, readLocal, readRemote, readFile } = {}) {
   const args = parseArgs(argv);
-  const hour = Number(args.hour ?? env.HOUR ?? 8);
-  const dry = args.dryRun || env.DRY_RUN === '1' || String(env.DRY_RUN).toLowerCase() === 'true';
-  const waitMin = Math.max(0, Number(args.wait ?? env.WAIT_MIN ?? 0) || 0);
-  if (!HOURS.includes(hour)) {
-    console.error(`❌ 받는 시각이 올바르지 않아요: ${args.hour ?? env.HOUR} (7, 8, 9 중 하나)`);
+  let hours = [Number(args.hour ?? env.HOUR ?? 8)];
+  let dry = args.dryRun || env.DRY_RUN === '1' || String(env.DRY_RUN).toLowerCase() === 'true';
+  let waitMin = Math.max(0, Number(args.wait ?? env.WAIT_MIN ?? 0) || 0);
+
+  // 시험 보내기: ops/push-now.json 이 바뀐 커밋이 main 에 올라오면 push.yml 이 파일에 적힌 대로 보내요.
+  if (env.PUSH_FILE) {
+    let cfg;
+    try {
+      cfg = JSON.parse(readFile ? readFile(env.PUSH_FILE) : fs.readFileSync(path.join(ROOT, env.PUSH_FILE), 'utf8'));
+    } catch (e) {
+      notice('시험 보내기를 건너뛰었어요', `${env.PUSH_FILE} 를 읽지 못했어요 (파일이 지워졌거나 JSON 모양이 아니에요).`);
+      return 0;
+    }
+    hours = (Array.isArray(cfg && cfg.hours) ? cfg.hours : [cfg && cfg.hour !== undefined ? cfg.hour : 8]).map(Number);
+    dry = !(cfg && cfg.dry_run === false); // false 라고 분명히 적었을 때만 진짜로 보내요
+    waitMin = 0;
+  }
+  hours = [...new Set(hours)];
+  if (!hours.length || hours.some((h) => !HOURS.includes(h))) {
+    console.error(`❌ 받는 시각이 올바르지 않아요: ${hours.join(', ') || '(없음)'} (7, 8, 9 중에서 골라요)`);
     return 1;
   }
 
@@ -237,6 +258,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
       sa = parseServiceAccount(saRaw);
     } catch (e) {
       console.error(`❌ ${e.message}`);
+      failure('서비스 계정 키가 이상해요', e.message);
       return 1;
     }
   } else if (!dry) {
@@ -256,43 +278,54 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   });
   if (!today) {
     warning('알림을 보내지 않았어요', `오늘(${date}) 해설이 아직 올라오지 않았어요. 지난 해설로 '새 해설' 알림을 보내지 않아요.`);
-    console.log(`오늘(${date}) 해설이 없어서 ${hour}시 알림을 보내지 않았어요.`);
+    console.log(`오늘(${date}) 해설이 없어서 ${hours.join('·')}시 알림을 보내지 않았어요.`);
     return 0;
   }
 
-  const messages = buildMessages({ today, groups, hour, date });
-  console.log(`${date} ${hour}시 알림: 분야 ${messages.length}곳 (오늘 해설 ${today.cards.length}개)${dry ? ' — 시험 보기(보내지 않아요)' : ''}`);
-  if (!messages.length) return 0;
-
-  if (dry) {
-    for (const m of messages) {
-      console.log(`- [${m.group}] ${m.title} / ${m.body}`);
-      console.log(`    조건: ${m.condition}  열기: ${m.route}  (해설 ${m.count}개)`);
-    }
-    return 0;
-  }
-
-  let accessToken;
-  try {
-    accessToken = await getAccessToken(sa, fetchImpl);
-  } catch (e) {
-    console.error(`❌ ${e.message}`);
-    return 1;
-  }
-
+  let accessToken = null;
   let failed = 0;
-  const sent = [];
-  for (const m of messages) {
-    try {
-      const name = await sendOne({ accessToken, projectId: sa.project_id, body: toFcmBody(m), fetchImpl, wait });
-      sent.push(m.group);
-      console.log(`✅ [${m.group}] 보냈어요 (${name.split('/').pop()})`);
-    } catch (e) {
-      failed++;
-      console.error(`❌ [${m.group}] 못 보냈어요: ${e.message}`);
+  for (const hour of hours) {
+    const messages = buildMessages({ today, groups, hour, date });
+    console.log(`${date} ${hour}시 알림: 분야 ${messages.length}곳 (오늘 해설 ${today.cards.length}개)${dry ? ' — 시험 보기(보내지 않아요)' : ''}`);
+    if (!messages.length) continue;
+
+    if (dry) {
+      const lines = [];
+      for (const m of messages) {
+        console.log(`- [${m.group}] ${m.title} / ${m.body}`);
+        console.log(`    조건: ${m.condition}  열기: ${m.route}  (해설 ${m.count}개)`);
+        lines.push(`[${m.group}] ${m.title} / ${m.body}`);
+      }
+      notice(`시험 보기 ${hour}시 (보내지 않아요)`, lines.join('\n'));
+      continue;
     }
+
+    if (!accessToken) {
+      try {
+        accessToken = await getAccessToken(sa, fetchImpl);
+      } catch (e) {
+        console.error(`❌ ${e.message}`);
+        failure('접근 토큰을 받지 못했어요', e.message);
+        return 1;
+      }
+    }
+
+    const sent = [];
+    let failedHere = 0;
+    for (const m of messages) {
+      try {
+        const name = await sendOne({ accessToken, projectId: sa.project_id, body: toFcmBody(m), fetchImpl, wait });
+        sent.push(m.group);
+        console.log(`✅ [${m.group}] 보냈어요 (${name.split('/').pop()})`);
+      } catch (e) {
+        failedHere++;
+        console.error(`❌ [${m.group}] 못 보냈어요: ${e.message}`);
+        failure(`${m.group} 알림을 못 보냈어요`, e.message);
+      }
+    }
+    failed += failedHere;
+    notice('분야별 알림', `${date} ${hour}시: ${sent.length}곳 보냄 (${sent.join(', ') || '없음'})${failedHere ? `, ${failedHere}곳 실패` : ''}`);
   }
-  notice('분야별 알림', `${date} ${hour}시: ${sent.length}곳 보냄 (${sent.join(', ') || '없음'})${failed ? `, ${failed}곳 실패` : ''}`);
   return failed ? 1 : 0;
 }
 
