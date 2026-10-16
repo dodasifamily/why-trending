@@ -10,8 +10,8 @@
 | --- | --- |
 | `site/` | 화면(HTML·CSS·JS)과 매일 바뀌는 해설 데이터(`site/data/`). GitHub Pages로 올라가요. |
 | `app/` | 안드로이드 앱 껍데기(Capacitor) 설정. 빌드할 때 `site/`를 복사해 넣어요. |
-| `scripts/` | 해설 데이터 검사·합치기 도구(`content.mjs`), 분야별 알림 보내기(`push.mjs`), 아이콘 생성기 등 |
-| `.github/workflows/` | 자동 빌드(`android.yml`), 사이트 배포(`pages.yml`), 분야별 알림 보내기(`push.yml`) |
+| `scripts/` | 해설 데이터 검사·합치기 도구(`content.mjs`), 아침 알림 보내기(`push.mjs`), 아이콘 생성기 등 |
+| `.github/workflows/` | 자동 빌드(`android.yml`), 사이트 배포(`pages.yml`), 아침 알림 보내기(`push.yml`) |
 | `ops/` | 매일 해설을 갱신하는 담당이 읽는 지침(`daily-job.md`, `fallback-runner.md`). 사이트·앱에는 올라가지 않아요. |
 
 ## 해설 데이터 규칙
@@ -30,14 +30,14 @@
 - `site/data/recent.json`(최근 14일 해설, 분야마다 최대 7개)은 사전(`terms.json`)에서 **올릴 때마다 만들어지는 파일**이에요(`node scripts/content.mjs recent`, `pages.yml`·`android.yml` 이 실행). 저장소에는 올리지 않아요(`.gitignore`). 앱은 오늘 해설(`today.json`)과 이 파일을 합쳐 분야별 목록을 만들어요.
 - 후보 카드를 미리 검사하려면 `node scripts/content.mjs check <파일.json>`, 최근 14일 안의 지난 화제를 사전에만 더하려면 `node scripts/content.mjs add <파일.json>` 을 써요(자세한 규칙은 `ops/daily-job.md`).
 
-### 분야별 알림 (푸시)
+### 아침 알림 (푸시)
 
 - 알림을 켜면 앱이 **고른 분야**(`cat_meme`, `cat_sports` …)와 **받는 시각**(`h7`·`h8`·`h9`)을 FCM 주제로 구독해요. 끄면 구독을 모두 풀고 이 기기의 알림 등록도 지워요(`deleteToken`). 알림을 켜기 전에는 앱이 기기 등록을 요청하지 않아요(매니페스트의 `firebase_messaging_auto_init_enabled=false`. 한 번 켠 뒤에는 플러그인의 `getToken()` 이 자동 등록을 다시 켜서, 끈 뒤에도 Google 서비스가 등록 값을 다시 만들 수 있어요. 주제 구독이 없으니 알림은 오지 않아요). 앱 쪽 코드는 `site/js/app.js` 의 `syncPush()`·`wantedTopics()` 예요.
-- 보내는 쪽은 `scripts/push.mjs`(`push.yml`)예요. 오늘 해설이 있는 분야마다 "그 분야 **그리고** 그 시각" 조건(`'cat_sports' in topics && 'h8' in topics`)으로 한 번씩 보내요. 오늘 해설이 아직 안 올라왔으면 최대 25분 기다리고, 그래도 없으면 보내지 않아요(지난 해설로 '새 해설' 알림을 보내지 않아요). 알림을 누르면 그 분야의 첫 해설(`#/t/<id>`)이 열려요.
+- 보내는 쪽은 `scripts/push.mjs`(`push.yml`)예요. **시각마다 알림은 1개**예요(분야별로 나누지 않아요). 오늘 해설이 있으면 그 시각을 고른 기기(주제 `h8` 등)에 한 번 보내요. 제목은 '오늘 뜨는 소식 N개', 내용은 서로 다른 분야의 대표 소식 2개와 나머지 개수예요(예: `GS25 맛집 김밥, 준플레이오프 1차전 외 6개 · 왜 뜨는지 30초로 알아봐요`). 대표 소식은 `today.json` 카드 순서(화제성 순)에서 서로 다른 분야의 앞쪽 2개예요. 오늘 해설이 아직 안 올라왔으면 최대 25분 기다리고, 그래도 없으면 보내지 않아요(지난 해설로 '새 해설' 알림을 보내지 않아요). 알림을 누르면 앱 첫 화면이 열려요. 앱은 분야 주제(`cat_*`)도 계속 구독하지만 지금은 알림에 쓰지 않아요(2026-10-17 에 분야별 알림 → 한 개로 바꿨어요).
 - **켜지는 조건**: GitHub Secrets 에 Firebase 설정이 있어야 해요. 없으면 앱은 지금처럼 기기 안 알림(매일 같은 글)만 쓰고, `push.yml` 은 아무것도 보내지 않고 끝나요.
   - `GOOGLE_SERVICES_JSON`: Firebase 콘솔에서 안드로이드 앱(패키지 이름 `io.github.dodasifamily.issuewhy`)을 등록하고 받은 `google-services.json` 의 내용 전체. 앱을 만들 때(`android.yml` → `app/scripts/prepare-fcm.mjs`) 써요. 패키지 이름이 다르면 빌드가 이유를 알려 주며 멈춰요.
   - `FCM_SERVICE_ACCOUNT_JSON`: Firebase 프로젝트 설정 → 서비스 계정 → '새 비공개 키 생성'으로 받은 JSON 의 내용 전체. 알림을 보낼 때(`push.yml`) 써요. **비밀 키예요.** 채팅·이슈·저장소에 올리지 말고 Secrets 에만 넣어요.
-- 직접 해 보기: Actions 탭 → '분야별 알림 보내기' → Run workflow. 처음에는 '보내지 않고 내용만 보기'를 `true` 로 두고 로그에서 보낼 내용을 확인해요.
+- 직접 해 보기: Actions 탭 → '아침 알림 보내기' → Run workflow. 처음에는 '보내지 않고 내용만 보기'를 `true` 로 두고 로그에서 보낼 내용을 확인해요.
 - 시험 보내기(저장소 안에서): `ops/push-now.json` 을 만들거나 바꾼 커밋을 main 에 올리면 `push.yml` 이 그 파일대로 보내요. 예: `{"hours": [8], "dry_run": false}` → 8시를 고른 기기에 진짜로 보내요. `dry_run` 을 `false` 로 분명히 적지 않으면 보내지 않고 내용만 보여줘요. `"validate_only": true` 를 더하면 FCM 에 '검사만' 부탁해서 기기에는 가지 않고 키·프로젝트 설정이 맞는지만 확인돼요. `"use_latest": true` 를 더하면 오늘 해설이 아직 없는 자정~아침에도 저장소에 올라와 있는 가장 최근 해설로 시험해요(예약 실행에서는 쓸 수 없어요). 같은 내용으로 다시 보내려면 `"nonce"` 같은 아무 값이나 바꿔서 올려요. 결과는 Actions 실행 화면의 '알림'에 나와요. 파일을 지우는 커밋은 아무것도 보내지 않아요.
 - 개인정보: 알림을 켜면 Google(Firebase Cloud Messaging)이 기기의 알림 등록 값·설치 ID·IP 등을 처리해요. 운영자는 이 값을 받지 않아요. 개인정보처리방침 6번에 적어 두었어요. 구글 플레이 '데이터 보안' 양식에는 '기기 또는 기타 ID'(앱 기능 목적, 알림을 켠 경우에만)를 적어야 해요. 양식을 쓸 때 구글 안내를 다시 확인해요.
 
@@ -59,7 +59,7 @@
 | 해설 갱신 확인 (Claude 대화) | 매일 06:40 (한국 시간) | 예약 작업이 실제로 도는지 확인되지 않아서, 대화가 직접 확인하고 오늘 분량이 없으면 `ops/daily-job.md` 대로 올려요 (`ops/fallback-runner.md`) |
 | 사이트 올리기 (`pages.yml`) | `site/` 가 바뀔 때, 매일 06:30 | 해설 검사 → 최근 14일 목록(`recent.json`) 만들기 → GitHub Pages 에 웹 화면과 최신 해설을 올려요. 앱도 여기서 최신 해설을 받아가요 |
 | 앱 만들기 (`android.yml`) | 화면·앱 설정이 바뀔 때 (해설 데이터만 바뀔 때는 안 돌아요) | 시험용 APK 를 만들어 릴리스 `test-latest` 에 올려요. 서명 키를 등록하면 출시용 AAB 도 만들어요. Firebase 설정을 등록해 두었다면 푸시 알림도 켜서 만들어요 |
-| 분야별 알림 보내기 (`push.yml`) | 매일 07:07·08:07·09:07 (한국 시간) | 오늘 해설이 있는 분야마다, 그 분야와 그 시각을 고른 기기에만 푸시 알림을 보내요. Firebase 키가 없으면 아무것도 안 하고 끝나요 |
+| 아침 알림 보내기 (`push.yml`) | 매일 07:07·08:07·09:07 (한국 시간) | 오늘 해설이 있으면, 그 시각을 고른 기기에 '오늘 뜨는 소식 N개' 알림을 1개 보내요. Firebase 키가 없으면 아무것도 안 하고 끝나요. GitHub 예약 실행은 20~30분 늦게 시작할 때가 있어요 |
 
 - 시험용 앱(폰에서 바로 설치): https://github.com/dodasifamily/why-trending/releases/download/test-latest/whyttuji-test.apk
   - 새 빌드가 끝나면 이미 있는 공개 릴리스를 **지우지 않고** 파일과 설명(빌드 번호·커밋)만 바꿔요(`scripts/ci-release.sh`). 릴리스가 없을 때만 새로 만들고, 실패하면 최대 4번 다시 해요. 그래서 `published_at` 은 처음 만든 날짜 그대로이고, 최신인지는 파일(asset)의 `updated_at` 과 설명의 빌드 번호로 봐요.

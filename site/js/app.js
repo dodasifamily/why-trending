@@ -1067,8 +1067,8 @@
   // ---------- 푸시 알림 (Firebase, 안드로이드 앱에서만) ----------
   // Firebase 설정이 들어간 앱에서만 켜져요. 아니면 fcm() 이 null 이라서 알림은 예전처럼 기기 안 예약(매일 같은 글)만 써요.
   // 알림을 켜면 '고른 분야'(cat_<분야>)와 '받는 시각'(h<시각>)을 FCM 주제로 구독해요.
-  // 서버(scripts/push.mjs)는 오늘 해설이 있는 분야마다 "cat_<분야> 그리고 h<시각>" 조건으로 한 번씩 보내서,
-  // 고른 분야·고른 시각의 기기에만 도착해요. 알림을 끄면 구독을 모두 풀고 이 기기의 등록도 지워요.
+  // 서버(scripts/push.mjs)는 시각 주제(h<시각>)로 하루 한 번, 알림 1개만 보내요 (분야별로 나누지 않아요).
+  // 분야 주제는 지금은 알림에 쓰지 않지만 그대로 구독해 둬요. 알림을 끄면 구독을 모두 풀고 이 기기의 등록도 지워요.
   const PUSH_TIMEOUT = 15000;
   const TOPIC_RE = /^[a-z0-9_]{1,30}$/;
 
@@ -1266,7 +1266,7 @@
           renderAlerts();
         }
       },
-      h('span', { style: 'display:block' }, h('span', { class: 'l1' }, '아침 알림'), h('span', { class: 'l2' }, push ? '내 분야에 새 해설이 올라오면 알려드려요' : '오늘 뜨는 말이 준비되면 알려드려요')),
+      h('span', { style: 'display:block' }, h('span', { class: 'l1' }, '아침 알림'), h('span', { class: 'l2' }, push ? '오늘 뜨는 소식을 하루 한 번 알려드려요' : '오늘 뜨는 말이 준비되면 알려드려요')),
       sw
     );
 
@@ -1299,7 +1299,7 @@
     setView(
       [
         h('h1', { class: 'h2big' }, '알림'),
-        h('p', { class: 'sub' }, push ? '고른 분야의 새 해설이 나온 날 아침에 알려드려요' : '매일 아침 오늘의 해설이 나왔다고 알려드려요'),
+        h('p', { class: 'sub' }, push ? '오늘 새로 뜬 소식을 아침에 한 번에 알려드려요' : '매일 아침 오늘의 해설이 나왔다고 알려드려요'),
         h('div', { class: 'panel' }, toggle, h('div', { class: 'label' }, '받는 시간'), h('div', { class: 'chips' }, hourChips), S.alertBusy > 0 && h('div', { class: 'status', role: 'status', style: 'margin-top:14px' }, '알림을 설정하는 중이에요…'), S.alertBusy === 0 && S.alertMsg && h('div', { class: 'status warn', role: 'status', style: 'margin-top:14px' }, S.alertMsg)),
         h(
           'div',
@@ -1307,7 +1307,7 @@
           h('div', { class: 'ptitle' }, '내 분야'),
           myPills.length ? h('div', { class: 'mypills', style: 'margin-top:12px' }, myPills) : h('p', { class: 'sub', style: 'margin:8px 0 0' }, S.groups ? '아직 고르지 않았어요.' : '분야 목록을 불러오지 못했어요.'),
           S.groups ? h('button', { class: 'btn ghost', type: 'button', style: 'margin-top:14px', onclick: () => go('/pick') }, '분야 바꾸기') : null,
-          h('div', { class: 'info' }, icon('info', 16), h('span', null, push ? '고른 분야의 이슈만 보여주고 알려드려요. 새 해설이 없는 분야는 알림이 오지 않아요. 알림은 정한 시각보다 몇 분 늦게 올 수 있어요. 정치, 사건사고, 실명 의혹은 다루지 않아요.' : '고른 분야의 이슈만 오늘 화면에 보여요. 정치, 사건사고, 실명 의혹은 다루지 않아요.'))
+          h('div', { class: 'info' }, icon('info', 16), h('span', null, push ? '앱 화면에는 고른 분야의 이슈만 보여드려요. 알림은 분야와 상관없이 하루 한 번, 오늘 새로 뜬 소식을 한꺼번에 알려드려요. 정한 시각보다 몇 분 늦게 올 수 있어요. 정치, 사건사고, 실명 의혹은 다루지 않아요.' : '고른 분야의 이슈만 오늘 화면에 보여요. 정치, 사건사고, 실명 의혹은 다루지 않아요.'))
         ),
         h('div', { class: 'info' }, icon('info', 16), h('span', null, AI_NOTE)),
         h('p', { class: 'legal' }, h('a', { href: 'privacy.html' }, '개인정보처리방침'))

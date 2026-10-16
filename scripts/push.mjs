@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 분야별 맞춤 알림을 FCM(HTTP v1)으로 보내요.
+// 아침 알림을 FCM(HTTP v1)으로 보내요. 시각마다 알림은 딱 1개예요 (분야별로 나누지 않아요).
 // GitHub Actions 의 push.yml 이 매일 아침 7시·8시·9시(한국 시간)에 한 번씩 실행해요.
 //
 // 사용:  node scripts/push.mjs [--hour 8] [--dry-run] [--wait 25]
@@ -19,8 +19,9 @@
 //
 // 하는 일
 //   1) 오늘(한국 시간) 해설이 main 에 올라올 때까지 기다려요 (git fetch 로 origin/main 의 today.json 을 봐요)
-//   2) 오늘 해설이 있는 분야마다 메시지를 1개씩 만들어, '그 분야를 고르고 이 시각을 고른 기기'에만 보내요
-//      (조건: 'cat_<분야>' in topics && 'h<시각>' in topics — 앱이 알림을 켤 때 이 주제들을 구독해요)
+//   2) 오늘 해설이 있으면 알림을 1개 만들어, '이 시각을 고른 기기'(주제 'h<시각>')에 보내요.
+//      제목은 '오늘 뜨는 소식 N개', 내용은 서로 다른 분야의 대표 소식 2개 + 나머지 개수예요. 누르면 앱 첫 화면이 열려요.
+//      (앱은 알림을 켤 때 'cat_<분야>' 와 'h<시각>' 주제를 함께 구독하지만, 알림은 분야와 상관없이 시각 주제로만 보내요)
 //   3) 오늘 해설이 없거나 아직 안 올라왔으면 아무것도 보내지 않아요. 지난 해설로 '새 해설' 알림을 보내지 않아요.
 //
 // 비밀 값(서비스 계정 키, 접근 토큰)은 화면에 출력하지 않아요.
@@ -35,7 +36,6 @@ export const HOURS = [7, 8, 9];
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
-const TOPIC_RE = /^[a-z0-9_]{1,30}$/;
 
 // ---------- 작은 도구 ----------
 export function kstDate(now = Date.now()) {
@@ -59,42 +59,50 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- 메시지 만들기 ----------
 /**
- * 오늘 해설이 있는 분야마다 알림 하나를 만들어요.
- * @returns {{group:string, condition:string, title:string, body:string, route:string, count:number}[]}
+ * 오늘 해설이 있으면 그 시각의 알림을 하나 만들어요 (분야별로 나누지 않아요).
+ * 제목에 오늘 해설 개수, 내용에 대표 소식 2개(서로 다른 분야의 첫 카드)와 나머지 개수를 넣어서
+ * 한 번에 새 소식을 보러 오게 해요. today.json 의 카드는 화제성 높은 순서로 올라와요.
+ * @returns {{group:string, topic:string, title:string, body:string, route:string, count:number}[]}
  */
-export function buildMessages({ today, groups, hour, date }) {
+export function buildMessages({ today, hour, date }) {
   if (!HOURS.includes(hour)) throw new Error(`받는 시각은 ${HOURS.join('·')} 중 하나여야 해요: ${hour}`);
-  const byGroup = new Map();
+  const cards = [];
   for (const c of (today && today.cards) || []) {
-    if (!c || c.date !== date || typeof c.id !== 'string' || typeof c.group !== 'string' || typeof c.keyword !== 'string') continue;
-    if (!byGroup.has(c.group)) byGroup.set(c.group, []);
-    byGroup.get(c.group).push(c);
+    if (!c || c.date !== date || typeof c.id !== 'string' || typeof c.group !== 'string' || typeof c.keyword !== 'string' || !c.keyword.trim()) continue;
+    cards.push(c);
   }
-  const out = [];
-  for (const g of groups || []) {
-    if (!g || !TOPIC_RE.test(String(g.id))) continue;
-    const list = byGroup.get(g.id);
-    if (!list || !list.length) continue;
-    const first = list[0];
-    const more = list.length - 1;
-    out.push({
-      group: g.id,
-      condition: `'cat_${g.id}' in topics && 'h${hour}' in topics`,
-      title: `오늘 뜨는 ${g.label}`,
-      body: `${first.keyword}${more > 0 ? ` 외 ${more}개` : ''} · 왜 뜨는지 30초로 알아봐요`,
-      route: `/t/${encodeURIComponent(first.id)}`,
-      count: list.length
-    });
+  if (!cards.length) return [];
+  const leads = [];
+  const seen = new Set();
+  for (const c of cards) {
+    if (leads.length >= 2) break;
+    if (seen.has(c.group)) continue;
+    seen.add(c.group);
+    leads.push(c);
   }
-  return out;
+  for (const c of cards) {
+    if (leads.length >= 2) break; // 분야가 하나뿐이면 같은 분야 카드로 채워요
+    if (!leads.includes(c)) leads.push(c);
+  }
+  const rest = cards.length - leads.length;
+  return [
+    {
+      group: 'all',
+      topic: `h${hour}`,
+      title: `오늘 뜨는 소식 ${cards.length}개`,
+      body: `${leads.map((c) => c.keyword.trim()).join(', ')}${rest > 0 ? ` 외 ${rest}개` : ''} · 왜 뜨는지 30초로 알아봐요`,
+      route: '/',
+      count: cards.length
+    }
+  ];
 }
 
-/** FCM HTTP v1 요청 본문 */
+/** FCM HTTP v1 요청 본문 (m.topic 이 있으면 그 주제로, 없으면 m.condition 조건으로 보내요) */
 export function toFcmBody(m, { validateOnly = false } = {}) {
   return {
     ...(validateOnly ? { validate_only: true } : {}),
     message: {
-      condition: m.condition,
+      ...(m.topic ? { topic: m.topic } : { condition: m.condition }),
       notification: { title: m.title, body: m.body },
       data: { route: m.route, group: m.group },
       android: {
@@ -296,7 +304,6 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   }
 
   let date = kstDate(now());
-  const groups = (readLocal ? readLocal('categories') : readJson('site/data/categories.json')).groups;
   if (useLatest) {
     let latest = null;
     try {
@@ -326,16 +333,16 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
   let accessToken = null;
   let failed = 0;
   for (const hour of hours) {
-    const messages = buildMessages({ today, groups, hour, date });
-    console.log(`${date} ${hour}시 알림: 분야 ${messages.length}곳 (오늘 해설 ${today.cards.length}개)${dry ? ' — 시험 보기(보내지 않아요)' : ''}`);
+    const messages = buildMessages({ today, hour, date });
+    console.log(`${date} ${hour}시 알림: ${messages.length}개 (오늘 해설 ${today.cards.length}개)${dry ? ' — 시험 보기(보내지 않아요)' : ''}`);
     if (!messages.length) continue;
 
     if (dry) {
       const lines = [];
       for (const m of messages) {
-        console.log(`- [${m.group}] ${m.title} / ${m.body}`);
-        console.log(`    조건: ${m.condition}  열기: ${m.route}  (해설 ${m.count}개)`);
-        lines.push(`[${m.group}] ${m.title} / ${m.body}`);
+        console.log(`- ${m.title} / ${m.body}`);
+        console.log(`    대상: 주제 ${m.topic}  열기: ${m.route}  (해설 ${m.count}개)`);
+        lines.push(`${m.title} / ${m.body}`);
       }
       notice(`시험 보기 ${hour}시 (보내지 않아요)`, lines.join('\n'));
       continue;
@@ -365,7 +372,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
       }
     }
     failed += failedHere;
-    notice(validateOnly ? '분야별 알림 (검사만)' : '분야별 알림', `${date} ${hour}시: ${sent.length}곳 ${validateOnly ? '검사 통과, 기기에는 보내지 않았어요' : '보냄'} (${sent.join(', ') || '없음'})${failedHere ? `, ${failedHere}곳 실패` : ''}`);
+    notice(validateOnly ? '아침 알림 (검사만)' : '아침 알림', `${date} ${hour}시: ${sent.length ? (validateOnly ? '검사 통과, 기기에는 보내지 않았어요' : '보냄') : '못 보냄'} — ${messages[0].title} / ${messages[0].body}${failedHere ? ` (${failedHere}개 실패)` : ''}`);
   }
   return failed ? 1 : 0;
 }
