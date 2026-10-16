@@ -115,7 +115,8 @@ jobs:
         working-directory: app/android
         run: |
           chmod +x gradlew
-          ../../scripts/ci-run.sh "APK 빌드" -- ./gradlew assembleDebug --no-daemon --stacktrace
+          # 구글·메이븐 부품 서버가 잠깐 안 될 때만 한 번 더 시도해요 (scripts/ci-gradle.sh)
+          ../../scripts/ci-run.sh "APK 빌드" -- bash ../../scripts/ci-gradle.sh
 
       # 만들어진 APK 안에 AdMob ID·권한·목표 SDK 가 제대로 들어갔는지 확인해요. (빠지면 여기서 멈춰요)
       - name: APK 안쪽 점검
@@ -163,7 +164,7 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          ../../scripts/ci-run.sh "AAB 빌드" -- ./gradlew bundleRelease --no-daemon --stacktrace
+          ../../scripts/ci-run.sh "AAB 빌드" -- bash ../../scripts/ci-gradle.sh bundleRelease
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
           AAB=app/build/outputs/bundle/release/app-release.aab
           jarsigner -sigalg SHA256withRSA -digestalg SHA-256 \
