@@ -73,6 +73,8 @@ const NEWS_CHANNELS = [
   '채널A News', '채널A 뉴스',
   'MBN News', 'TV CHOSUN News',
   '연합뉴스TV', '연합뉴스TV Yonhap News TV', '연합뉴스 Yonhapnews', '연합뉴스',
+  // 신문사·방송사가 직접 운영하는 영상 채널: 서울경제TV(서울경제), 14F 일사에프(한국일보), 전자신문 etnews(전자신문), 엠빅뉴스(MBC), Arirang News(아리랑TV)
+  '서울경제TV', '14F 일사에프', '전자신문 etnews', '엠빅뉴스', 'Arirang News',
   'ABC News', 'Bloomberg Television', 'CNBC Television', 'Reuters', 'BBC News', 'CNN', 'Associated Press', 'NBC News', 'CBS News', 'Sky News'
 ];
 // 제목에 이런 말이 있으면 반응 영상·모음·자극적인 영상일 가능성이 커서 쓰지 않아요.

@@ -653,6 +653,16 @@
         "📱",
         "🔒"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "3uMX6JS1GoQ",
+          "kind": "news",
+          "channel": "CNBC Television",
+          "title": "Apple's smart home push: Here's what you need to know"
+        }
+      ],
       "sources": [
         {
           "name": "전자신문",
@@ -692,6 +702,16 @@
         "📚",
         "🍞",
         "🔖"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "H70i-Q-pNB4",
+          "kind": "news",
+          "channel": "KBS News",
+          "title": "빵까지 완판한 민음사…‘책갈피 랜덤깡’ 통했다 [경제콘서트] / KBS 2026.08.27."
+        }
       ],
       "sources": [
         {
@@ -739,6 +759,16 @@
         "💯",
         "🤥"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "eT51REexsZU",
+          "kind": "official",
+          "channel": "tvN DRAMA",
+          "title": "[D-100 티저] 운명을 건 100일, 가장 치열한 거짓말이 시작된다. #100일의거짓말 EP.0"
+        }
+      ],
       "sources": [
         {
           "name": "미주중앙일보",
@@ -785,6 +815,16 @@
         "💼",
         "📺"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "FirYC3S1wXo",
+          "kind": "official",
+          "channel": "TVING 티빙",
+          "title": "[로또 1등도 출근합니다] 로또 1등 됐으니까 재미난 거 보여줄게 | 1-2화 선공개 | TVING"
+        }
+      ],
       "sources": [
         {
           "name": "더팩트",
@@ -818,6 +858,16 @@
         "🤖",
         "🧠",
         "⬆️"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "Jh6mgf9M06M",
+          "kind": "official",
+          "channel": "Google for Developers",
+          "title": "Gemini 4 Argon: What’s new and what’s next"
+        }
       ],
       "sources": [
         {
@@ -859,6 +909,16 @@
         "🗺️",
         "🗣️"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "vojatBmo7wA",
+          "kind": "news",
+          "channel": "서울경제TV",
+          "title": "삼성·구글 발칵 뒤집혔다! 네이버 지도 품은 메타 AI 안경, 웨어러블 판도 바꾼다"
+        }
+      ],
       "sources": [
         {
           "name": "아이뉴스24",
@@ -899,6 +959,16 @@
         "🏟️",
         "🔥"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "41F-_WHq_hQ",
+          "kind": "official",
+          "channel": "TVING SPORTS",
+          "title": "[두산 vs LG] 10/14 와일드카드 결정전 1차전 I 2026 신한 SOL뱅크 KBO 포스트시즌 I 하이라이트 I TVING"
+        }
+      ],
       "sources": [
         {
           "name": "파이낸셜뉴스",
@@ -938,6 +1008,16 @@
         "🎬",
         "🍿",
         "🏆"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "Mzw2ttJD2qQ",
+          "kind": "official",
+          "channel": "Universal Pictures",
+          "title": "The Odyssey | Official Trailer"
+        }
       ],
       "sources": [
         {
@@ -1019,6 +1099,16 @@
         "🥇",
         "🏆"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "-H-FZkPt1-M",
+          "kind": "official",
+          "channel": "PLAVE 플레이브",
+          "title": "PLAVE 5th Mini Album 'HYPERDRIVE' Highlight Medley"
+        }
+      ],
       "sources": [
         {
           "name": "스포츠경향",
@@ -1051,6 +1141,16 @@
         "💿",
         "📦",
         "🎉"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "xIlFjHHUfI0",
+          "kind": "official",
+          "channel": "NCT WISH",
+          "title": "NCT WISH 엔시티 위시 'I SPY' MV"
+        }
       ],
       "sources": [
         {
@@ -1092,6 +1192,16 @@
         "📺",
         "🔥"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "4e_kNXYtO_A",
+          "kind": "official",
+          "channel": "SBS",
+          "title": "[스페셜 티저] 부정부패를 수술할 천재 외과의 김지원의 메디컬 느와르💉 | 닥터X : 하얀 마피아의 시대 | SBS"
+        }
+      ],
       "sources": [
         {
           "name": "위키트리",
@@ -1132,6 +1242,16 @@
         "🏟️",
         "👋"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "1z2brGzMaC8",
+          "kind": "news",
+          "channel": "KBS News",
+          "title": "44년 잠실 안녕, 그런데 대체 구장 1만 8천 석? [9시 뉴스] / KBS"
+        }
+      ],
       "sources": [
         {
           "name": "데일리안",
@@ -1165,6 +1285,16 @@
         "👹",
         "🎮",
         "📈"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "NE_x0FSJ2Ao",
+          "kind": "official",
+          "channel": "도깨비의세계",
+          "title": "[도깨비의세계] 차원이 다른 2.5D 세상이 온다! (Teaser)"
+        }
       ],
       "sources": [
         {
@@ -1295,6 +1425,16 @@
         "🍿",
         "🥰"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "-DjykB2XImc",
+          "kind": "official",
+          "channel": "CJ ENM Movie",
+          "title": "[극장판 치이카와: 인어 섬의 비밀] 메인 예고편"
+        }
+      ],
       "sources": [
         {
           "name": "일간스포츠",
@@ -1334,6 +1474,16 @@
         "🏐",
         "📺",
         "🔥"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "KCX6fZ3NIUs",
+          "kind": "news",
+          "channel": "엠빅뉴스",
+          "title": "더 큰 판으로 돌아온 원더독스..“창단 아니면 시즌3는 없다”"
+        }
       ],
       "sources": [
         {
@@ -1415,6 +1565,16 @@
         "🎧",
         "😌"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "7mDDM0eBWR0",
+          "kind": "official",
+          "channel": "i-dle (아이들)",
+          "title": "소연 (SOYEON) '퇴사할게여 (Narr. 기안84)' Official Music Video"
+        }
+      ],
       "sources": [
         {
           "name": "일간스포츠",
@@ -1448,6 +1608,16 @@
         "🍡",
         "🏪",
         "❄️"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "1vFGplnc4IQ",
+          "kind": "news",
+          "channel": "14F 일사에프",
+          "title": "나오기만 하면 유행 ‘한정선’을 집 앞에서?... GS25 ‘한정선 요거트 찹쌀떡’ / 14F"
+        }
       ],
       "sources": [
         {
@@ -1488,6 +1658,16 @@
         "🎮",
         "📮",
         "🏅"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "zasOeVMdym8",
+          "kind": "official",
+          "channel": "우체국",
+          "title": "👑 e스포츠의 전설 ‘페이커(Faker)’ 기념우표 출시!"
+        }
       ],
       "sources": [
         {
@@ -1572,6 +1752,16 @@
         "🌃",
         "🎶"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "0udwgHtv22Q",
+          "kind": "news",
+          "channel": "SBS 뉴스",
+          "title": "팝스타 위켄드 8년 만에 내한한다..10월 고양서 콘서트 / SBS / 굿모닝연예"
+        }
+      ],
       "sources": [
         {
           "name": "경향신문",
@@ -1611,6 +1801,16 @@
         "🏚️",
         "🏍️",
         "📺"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "2ipog92WubY",
+          "kind": "official",
+          "channel": "MBCentertainment",
+          "title": "[나 혼자 산다] 깨진 바닥을 직접 보수 공사하는 김민💦 능숙한 솜씨로 어느새 매끈해진 바닥, MBC 261002 방송"
+        }
       ],
       "sources": [
         {
@@ -1688,6 +1888,16 @@
         "🌍",
         "⚔️"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "Y0OrNb7SJx0",
+          "kind": "official",
+          "channel": "AION2",
+          "title": "[아이온2] 게임플레이 트레일러"
+        }
+      ],
       "sources": [
         {
           "name": "SBS Biz",
@@ -1762,6 +1972,16 @@
         "🎶",
         "🍿"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "aMOrloU5Bho",
+          "kind": "official",
+          "channel": "CJ ENM Movie",
+          "title": "[타짜: 벨제붑의 노래] 메인 예고편"
+        }
+      ],
       "sources": [
         {
           "name": "iMBC 연예",
@@ -1795,6 +2015,16 @@
         "🤖",
         "📋",
         "⬇️"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "GJ_058dVYzU",
+          "kind": "news",
+          "channel": "전자신문 etnews",
+          "title": "Google Restricts Access to Advanced Gemini Features for Free and Low-Tier Users"
+        }
       ],
       "sources": [
         {
@@ -1836,6 +2066,16 @@
         "👨",
         "😂"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "nBAoN19g590",
+          "kind": "news",
+          "channel": "KBS News",
+          "title": "[현장영상] 전체 1순위 하현승부터 ‘라밤바’까지…드래프트 명장면 / KBS 2026.09.21."
+        }
+      ],
       "sources": [
         {
           "name": "일간스포츠",
@@ -1876,6 +2116,16 @@
         "🥇",
         "🏆"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "isjiXfL6IR8",
+          "kind": "news",
+          "channel": "YTN",
+          "title": "kt, 5년 만에 정규시즌 우승...3~5위 싸움 치열 / YTN"
+        }
+      ],
       "sources": [
         {
           "name": "헤럴드경제 미주판",
@@ -1909,6 +2159,16 @@
         "🍞",
         "📸",
         "🎤"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "qeCTd0Cm6iE",
+          "kind": "news",
+          "channel": "JTBC News",
+          "title": "\"삼촌이 다 사줄게\"…'리센느 빵' 60만개, 가장 많이 산 건 30대 남성｜지금 이 쇼츠"
+        }
       ],
       "sources": [
         {
@@ -1950,6 +2210,16 @@
         "🥇",
         "🎆"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "A4bvScrswuI",
+          "kind": "news",
+          "channel": "Arirang News",
+          "title": "S. Korea finishes 3rd at Asian Games with 39 gold, 43 silver, 68 bronze"
+        }
+      ],
       "sources": [
         {
           "name": "헤럴드경제 미주판",
@@ -1982,6 +2252,16 @@
         "🙏",
         "🔑",
         "🔔"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "PmXR-6HtXIQ",
+          "kind": "news",
+          "channel": "채널A News",
+          "title": "새벽부터 봉은사 ‘오픈런’…‘공덕 키링’ 인기, 왜? / 채널A / 뉴스A"
+        }
       ],
       "sources": [
         {
