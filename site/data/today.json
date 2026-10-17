@@ -22,6 +22,16 @@
         "🚀",
         "✨"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "7p5LxFdc-Qg",
+          "kind": "official",
+          "channel": "Tesla",
+          "title": "The Ramp | Roadster"
+        }
+      ],
       "sources": [
         {
           "name": "이코노미스트",
@@ -74,6 +84,16 @@
         "📖",
         "✨"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "FUfGcZ092b0",
+          "kind": "official",
+          "channel": "Apple",
+          "title": "Introducing the new iPhone Duo"
+        }
+      ],
       "sources": [
         {
           "name": "노컷뉴스",
@@ -108,6 +128,16 @@
         "한국경제에 따르면 14일 오전 9시 치이카와샵 대기 화면에는 '현재 대기 297팀, 예상 대기시간 174분'이 떴어요. 오픈런은 전날 밤 10시쯤 시작되고, 새벽에는 최대 500여 명이 몰린다고 해요.",
         "한국경제는 번개장터 자료를 인용해 10월 첫째 주 치이카와 검색량이 7월 첫째 주의 약 14배, 같은 기간 안전결제 거래 건수는 9.6배로 늘었다고 전했어요.",
         "밝고 귀여운 주인공이 자격증을 따고 일하며 생계를 겨우 잇는 현실적인 세계관이 취업난과 불확실한 미래에 지친 청년층의 공감을 얻었다고 한국경제는 분석했어요. SBS는 16일 보도에서 캐릭터 인형을 사려는 밤샘 오픈런이 벌어지고 있다고 전했어요."
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "O0bQFusOyLA",
+          "kind": "official",
+          "channel": "대원미디어DAEWON",
+          "title": "[극장판 치이카와: 인어 섬의 비밀] 극장으로 모여라!"
+        }
       ],
       "sources": [
         {
@@ -161,6 +191,16 @@
         "🌟",
         "📈"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "iXn4YcN2v7Y",
+          "kind": "news",
+          "channel": "YTN",
+          "title": "돌고 돌아 '이수만'...데뷔곡부터 심상찮은 신인 여돌 [자막뉴스] / YTN"
+        }
+      ],
       "sources": [
         {
           "name": "톱스타뉴스",
@@ -206,6 +246,16 @@
         "🆚",
         "🏆"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "Q9DD0gmcYXE",
+          "kind": "news",
+          "channel": "JTBC News",
+          "title": "박해민 이 수비가 구했다…LG, 두산 꺾고 준플레이오프 진출, KIA와 승부｜지금 이 장면"
+        }
+      ],
       "sources": [
         {
           "name": "파이낸셜뉴스",
@@ -246,6 +296,16 @@
         "🧊",
         "🏆"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "xe2Z16y0ep8",
+          "kind": "official",
+          "channel": "SOOP esports EN",
+          "title": "[10/17 3PM KST] Google Play ASL S22 FINALS"
+        }
+      ],
       "sources": [
         {
           "name": "머니투데이",
@@ -285,6 +345,16 @@
         "🎮",
         "🏆",
         "🌎"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "Ye5lIxNxNCo",
+          "kind": "official",
+          "channel": "LoL Esports",
+          "title": "Worlds 2026 has ARRIVED!"
+        }
       ],
       "sources": [
         {
@@ -332,6 +402,16 @@
         "🙌",
         "🏖️"
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "gpJ-pYAjDVw",
+          "kind": "news",
+          "channel": "연합뉴스TV",
+          "title": "시장님 앞에서 \"거제 야호~\"…리센느 금의환향 현장 [현장쏙] / 연합뉴스TV(YonhapnewsTV)"
+        }
+      ],
       "sources": [
         {
           "name": "동행미디어 시대",
@@ -365,6 +445,16 @@
         "🕹️",
         "👾",
         "🎬"
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "CNpGIrrmx18",
+          "kind": "official",
+          "channel": "LOCUS Animation Studios",
+          "title": "[전자오락수호대] 메인 예고편"
+        }
       ],
       "sources": [
         {

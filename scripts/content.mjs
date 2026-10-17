@@ -6,10 +6,12 @@
 //   node scripts/content.mjs recent     최근 2주 해설을 분야마다 7개까지 모은 recent.json 만들기 (사이트·앱을 올릴 때 자동으로 만들어져요. 저장소에는 올리지 않아요)
 //   node scripts/content.mjs check <카드목록.json>   새 카드 후보 파일이 규칙에 맞는지만 검사 (사전·today 는 건드리지 않아요)
 //   node scripts/content.mjs add <카드목록.json>     검사를 통과한 지난 카드를 사전(terms.json)에만 추가 (오늘 카드는 today.json + merge 로 올려요)
+//   node scripts/content.mjs verify-media [--prune]  카드에 붙인 유튜브 영상이 실제로 있고 다른 곳에서 재생이 허용되는지 유튜브에 물어봐요
+//                                                     (인터넷이 되는 GitHub Actions 에서 써요. --prune 이면 막힌 영상만 올릴 파일에서 빼요)
 //
 // 옵션: --site <폴더>   기본값은 site
 //
-// 규칙의 목적: 출처 없는 내용, 민감한 주제, 너무 긴 글, 출처가 불분명한 영상, 며칠 전·지난달 기사에 기댄 '오늘 소식'이 앱에 올라가지 않게 막는 안전장치예요.
+// 규칙의 목적: 출처 없는 내용, 민감한 주제, 너무 긴 글, 올린 곳이 불분명한 영상, 며칠 전·지난달 기사에 기댄 '오늘 소식'이 앱에 올라가지 않게 막는 안전장치예요.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -51,10 +53,31 @@ const MEME_FRESH_SOURCE_DAYS = 7;
 const MIN_FRESH_OUTLETS = 2;
 
 // 해설 화면에 붙이는 영상 규칙.
-// 저작권 때문에 기사 사진은 가져다 쓰지 않아요. 대신 '출처로 단 기사 페이지에 매체가 직접 실어 둔 유튜브 영상'만
-// 미리보기(썸네일)와 재생 링크로 보여줘요. 그래서 영상에는 반드시 그 기사 주소(from)가 따라붙고,
-// 그 기사는 카드의 출처 목록에도 들어 있어야 해요. (기사 페이지에 영상이 정말 있는지는 갱신 담당이 직접 열어 확인해요)
-// 목록에 없는 매체의 기사에서는 영상을 가져오지 않아요. 새 매체를 허용하려면 여기에 추가해요.
+// 기사 사진·짤·캡처는 저작권 때문에 가져다 쓰지 않아요. 영상은 유튜브 공식 플레이어로만 보여줘요(영상은 올린 곳에서 그대로 재생돼요).
+// 아무 영상이나 붙지 않도록 '누가 올린 영상인지'를 두 가지로 제한하고, 카드마다 그 채널 이름과 제목을 적어 둬요.
+//   official: 그 소식의 당사자나 권리를 가진 곳(가수·소속사·기업·구단·리그·게임사·영화 제작·배급사·방송 프로그램 등)이 직접 운영하는 채널의 영상
+//   news:     NEWS_CHANNELS 에 있는 방송·언론사 채널의 영상
+// 리액션·모음·재업로드·개인 편집본·제목으로 낚는 영상은 쓰지 않아요. 갱신 담당이 영상 페이지를 직접 열어 제목·채널·날짜를 확인한 것만 넣어요.
+// (예전 형식 — channel 없이 from 만 있는 항목: 출처로 단 기사 페이지에 매체가 직접 실어 둔 영상 — 도 그대로 받아요.)
+const VIDEO_KINDS = ['official', 'news'];
+const VIDEO_CHANNEL_MAX = 40;
+const VIDEO_TITLE_MAX = 120;
+// 뉴스 채널 허용 목록. 유튜브에 보이는 채널 이름 그대로예요(대소문자·띄어쓰기는 가리지 않아요).
+// 새 채널을 허용하려면 채널 이름을 직접 열어 방송·언론사가 운영하는 곳인지 확인한 뒤 여기에 추가해요.
+const NEWS_CHANNELS = [
+  'YTN', 'YTN star', 'YTN dmb', 'YTN 사이언스', 'YTN 사이언스 투데이',
+  'SBS 뉴스', 'SBS News', 'SBS Biz', 'SBS 연예뉴스',
+  'KBS News', 'KBS 뉴스',
+  'MBCNEWS', 'MBC 뉴스',
+  'JTBC News',
+  '채널A News', '채널A 뉴스',
+  'MBN News', 'TV CHOSUN News',
+  '연합뉴스TV', '연합뉴스TV Yonhap News TV', '연합뉴스 Yonhapnews', '연합뉴스',
+  'ABC News', 'Bloomberg Television', 'CNBC Television', 'Reuters', 'BBC News', 'CNN', 'Associated Press', 'NBC News', 'CBS News', 'Sky News'
+];
+// 제목에 이런 말이 있으면 반응 영상·모음·자극적인 영상일 가능성이 커서 쓰지 않아요.
+const VIDEO_TITLE_BLOCKED = /리액션|reaction|해외\s*반응|반응\s*영상|모음|compilation|충격|경악|폭로|논란|의혹|ㄷㄷ/i;
+// 예전 형식(from) 영상을 가져오는 기사 매체
 const VIDEO_FROM_HOSTS = [
   'www.ytn.co.kr', // 확인됨: 기사 페이지에 자사 유튜브 영상을 싣는 매체
   'www.yna.co.kr',
@@ -65,6 +88,11 @@ const VIDEO_FROM_HOSTS = [
   'news.jtbc.co.kr'
 ];
 const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
+
+function normName(s) {
+  return String(s || '').normalize('NFKC').toLowerCase().replace(/[\s·・\-_.'’"]/g, '');
+}
+const NEWS_CHANNEL_KEYS = new Set(NEWS_CHANNELS.map(normName));
 
 // 다루지 않기로 한 주제의 단서가 되는 말들이에요. 걸리면 그 카드는 빼거나 다시 써야 해요.
 const BLOCKED_WORDS = [
@@ -222,7 +250,9 @@ function validateScene(card, where) {
 }
 
 // media 는 선택 항목이에요. 없으면 앱이 분야별 그림 카드를 대신 보여줘요.
-// 형식: "media": [{ "type": "video", "provider": "youtube", "id": "11글자", "from": "출처로 단 기사 주소" }]
+// 형식: "media": [{ "type": "video", "provider": "youtube", "id": "11글자", "kind": "official 또는 news",
+//                   "channel": "유튜브에 보이는 채널 이름", "title": "유튜브에 적힌 영상 제목", "from": "(선택) 영상을 소개한 출처 기사 주소" }]
+// 예전 형식(channel·kind·title 없이 from 만 있는 영상)도 받아요: { "type", "provider", "id", "from": "출처로 단 기사 주소" }
 function validateMedia(card, where) {
   if (card.media === undefined) return;
   if (!Array.isArray(card.media) || card.media.length !== 1) {
@@ -232,21 +262,41 @@ function validateMedia(card, where) {
     const w = `${where}.media[${i}]`;
     if (!m || typeof m !== 'object' || Array.isArray(m)) return err(w, '객체가 아니에요');
     if (m.type !== 'video') return err(w, "type 은 'video' 만 쓸 수 있어요");
-    const extra = Object.keys(m).filter((k) => !['type', 'provider', 'id', 'from'].includes(k));
+    const extra = Object.keys(m).filter((k) => !['type', 'provider', 'id', 'kind', 'channel', 'title', 'from'].includes(k));
     if (extra.length) err(w, `쓸 수 없는 항목이 있어요: ${extra.join(', ')}`);
     if (m.provider !== 'youtube') err(w, "provider 는 'youtube' 여야 해요");
     if (typeof m.id !== 'string' || !YOUTUBE_ID.test(m.id)) err(w, 'id 는 유튜브 영상 주소의 11글자 번호여야 해요 (영문·숫자·-·_)');
-    const from = Array.isArray(card.sources) ? card.sources.find((s) => s && s.url === m.from) : undefined;
-    if (!from) {
-      err(w, 'from 은 이 카드의 출처(sources)에 들어 있는 기사 주소여야 해요');
-    } else {
-      try {
-        const host = new URL(from.url).hostname;
-        if (!VIDEO_FROM_HOSTS.includes(host)) err(w, `${host} 기사에서는 영상을 가져오지 않아요 (허용 매체: ${VIDEO_FROM_HOSTS.join(', ')})`);
-      } catch {
-        /* 주소 형식 오류는 sources 검사에서 이미 알려줘요 */
+    const from = Array.isArray(card.sources) && m.from !== undefined ? card.sources.find((s) => s && s.url === m.from) : undefined;
+    const legacy = m.kind === undefined && m.channel === undefined && m.title === undefined;
+
+    if (legacy) {
+      // 예전 형식: 출처로 단 기사(허용 매체)에 실린 영상
+      if (!from) {
+        err(w, 'from 은 이 카드의 출처(sources)에 들어 있는 기사 주소여야 해요');
+      } else {
+        try {
+          const host = new URL(from.url).hostname;
+          if (!VIDEO_FROM_HOSTS.includes(host)) err(w, `${host} 기사에서는 영상을 가져오지 않아요 (허용 매체: ${VIDEO_FROM_HOSTS.join(', ')})`);
+        } catch {
+          /* 주소 형식 오류는 sources 검사에서 이미 알려줘요 */
+        }
       }
+      return;
     }
+
+    // 새 형식: 누가 올린 영상인지(kind·channel)와 제목을 함께 적어요
+    if (!VIDEO_KINDS.includes(m.kind)) err(w, `kind 는 ${VIDEO_KINDS.join(' / ')} 중 하나여야 해요 (official: 당사자·권리를 가진 곳의 공식 채널, news: 방송·언론사 뉴스 채널)`);
+    checkString(w, 'channel', m.channel, 1, VIDEO_CHANNEL_MAX);
+    checkString(w, 'title', m.title, 1, VIDEO_TITLE_MAX);
+    if (typeof m.channel === 'string') scanBlocked(w, 'channel', m.channel);
+    if (typeof m.title === 'string') {
+      scanBlocked(w, 'title', m.title);
+      if (VIDEO_TITLE_BLOCKED.test(m.title)) err(w, `영상 제목에 반응 영상·모음·자극적인 영상의 단서가 있어요: ${m.title}`);
+    }
+    if (m.kind === 'news' && typeof m.channel === 'string' && !NEWS_CHANNEL_KEYS.has(normName(m.channel))) {
+      err(w, `'${m.channel}' 은(는) 뉴스 채널 허용 목록에 없어요. 방송·언론사 채널이 맞다면 content.mjs 의 NEWS_CHANNELS 에 먼저 추가하고, 아니면 official(당사자 공식 채널)인 경우에만 쓰세요`);
+    }
+    if (m.from !== undefined && !from) err(w, 'from 을 쓴다면 이 카드의 출처(sources)에 들어 있는 기사 주소여야 해요');
   });
 }
 
@@ -492,14 +542,161 @@ function add(file) {
   console.log(`✅ 사전에 ${cards.length}개를 더했어요: 총 ${merged.length}개`);
 }
 
+// ---------- 영상 확인 (인터넷이 되는 곳에서만 써요) ----------
+// 카드에 붙인 영상이 지워졌거나 다른 곳에서 재생이 막혔는지, 적어 둔 채널이 실제로 올린 곳과 같은지 유튜브(oEmbed)에 물어봐요.
+//  - 유튜브가 확실히 '없다 / 재생이 막혔다 / 채널이 다르다'고 알려준 영상만 문제로 봐요.
+//    인터넷 문제 등으로 확인하지 못한 영상은 그대로 두어요.
+//  - 확인용 영상(CANARY)조차 열리지 않으면 이 컴퓨터에서는 확인이 안 되는 상태라서, 아무것도 빼지 않고 건너뛰어요.
+//  - --prune 이면 문제 영상을 '올릴 파일'(today·terms·recent)에서만 빼요. 저장소에 저장된 원본은 건드리지 않아요.
+const OEMBED_URL = process.env.YT_OEMBED_URL || 'https://www.youtube.com/oembed';
+const CANARY_ID = 'jNQXAC9IVRw'; // 유튜브의 첫 영상. 오래 남아 있는 확인용 영상이에요.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function askOembed(id) {
+  const url = `${OEMBED_URL}?url=${encodeURIComponent('https://www.youtube.com/watch?v=' + id)}&format=json`;
+  let last = { status: 0, inconclusive: true };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000), headers: { 'user-agent': 'whyttuji-media-check/1.0' } });
+      if (res.status === 200) {
+        const j = await res.json();
+        return { status: 200, author: String(j.author_name || ''), title: String(j.title || '') };
+      }
+      if (res.status === 401 || res.status === 403 || res.status === 404) return { status: res.status };
+      last = { status: res.status, inconclusive: true };
+    } catch (e) {
+      last = { status: 0, inconclusive: true, error: e && e.message };
+    }
+    if (attempt === 0) await sleep(1500);
+  }
+  return last;
+}
+
+function textKey(s) {
+  return String(s || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+}
+function dice(a, b) {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const grams = (s) => {
+    const m = new Map();
+    const c = [...s];
+    for (let i = 0; i < c.length - 1; i++) m.set(c[i] + c[i + 1], (m.get(c[i] + c[i + 1]) || 0) + 1);
+    return m;
+  };
+  const A = grams(a);
+  const B = grams(b);
+  let inter = 0;
+  let total = 0;
+  for (const n of A.values()) total += n;
+  for (const n of B.values()) total += n;
+  for (const [k, n] of A) inter += Math.min(n, B.get(k) || 0);
+  return total ? (2 * inter) / total : 0;
+}
+// GitHub Actions 의 줄 메모(annotation)에 넣을 글자 처리
+const ghEsc = (s) => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+
+async function verifyMedia() {
+  const prune = argv.includes('--prune');
+  const files = [
+    { path: TODAY_PATH, list: (j) => j.cards },
+    { path: TERMS_PATH, list: (j) => j.terms },
+    { path: RECENT_PATH, list: (j) => j.cards }
+  ]
+    .filter((f) => existsSync(f.path))
+    .map((f) => ({ ...f, json: readJson(f.path) }));
+
+  const videos = new Map(); // id -> { id, channel, title, cards }
+  for (const f of files) {
+    for (const c of f.list(f.json) || []) {
+      const m = c && Array.isArray(c.media) ? c.media[0] : null;
+      if (!m || typeof m.id !== 'string' || !YOUTUBE_ID.test(m.id)) continue;
+      const v = videos.get(m.id) || { id: m.id, channel: m.channel, title: m.title, cards: new Set() };
+      v.cards.add(c.id);
+      videos.set(m.id, v);
+    }
+  }
+  if (!videos.size) return console.log('ℹ️ 확인할 영상이 없어요');
+
+  const canary = await askOembed(CANARY_ID);
+  if (canary.status !== 200) {
+    console.log(`::warning title=영상 확인을 건너뛰었어요::확인용 영상이 열리지 않아서(응답 ${canary.status}) 영상 ${videos.size}개를 확인하지 못했고, 아무것도 빼지 않았어요`);
+    return;
+  }
+
+  const queue = [...videos.values()];
+  const results = [];
+  const worker = async () => {
+    while (queue.length) {
+      const v = queue.shift();
+      results.push({ v, r: await askOembed(v.id) });
+      await sleep(150);
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  results.sort((a, b) => [...a.v.cards][0].localeCompare([...b.v.cards][0]));
+
+  const bad = new Set();
+  const notes = [];
+  const problems = [];
+  let ok = 0;
+  let unknown = 0;
+  for (const { v, r } of results) {
+    const cards = [...v.cards].join(',');
+    if (r.status === 200) {
+      const sameChannel = v.channel === undefined || normName(r.author) === normName(v.channel);
+      if (!sameChannel) {
+        bad.add(v.id);
+        problems.push(`${v.id} (${cards}): 적어 둔 채널 '${v.channel}' 과 실제 채널 '${r.author}' 이 달라요 → 뺐어요`);
+      } else {
+        ok++;
+        const similar = v.title === undefined || dice(textKey(r.title), textKey(v.title)) >= 0.5 || textKey(r.title).includes(textKey(v.title)) || textKey(v.title).includes(textKey(r.title));
+        notes.push(`${v.id} | ${r.author} | ${r.title}${similar ? '' : '   (적어 둔 제목과 달라요: ' + v.title + ')'} | ${cards}`);
+      }
+    } else if (r.inconclusive) {
+      unknown++;
+      notes.push(`${v.id} | 확인 못 함 (응답 ${r.status}${r.error ? ', ' + r.error : ''}) | ${cards}`);
+    } else {
+      bad.add(v.id);
+      const why = r.status === 401 ? '다른 곳에서 재생이 막혀 있어요' : '영상이 없거나 비공개예요';
+      problems.push(`${v.id} (${cards}): ${why} (응답 ${r.status}) → 뺐어요`);
+    }
+  }
+
+  for (const line of notes) console.log('  ' + line);
+  for (const line of problems) console.log('  ❌ ' + line);
+  // 줄 메모는 종류마다 10개까지만 보여서, 여러 줄을 묶어서 남겨요
+  for (let i = 0; i < notes.length; i += 8) console.log(`::notice title=영상 확인 결과 (${i + 1}~${Math.min(i + 8, notes.length)})::${ghEsc(notes.slice(i, i + 8).join('\n'))}`);
+  if (problems.length) console.log(`::warning title=재생이 안 되는 영상 ${problems.length}개::${ghEsc(problems.join('\n'))}`);
+  console.log(`✅ 영상 ${videos.size}개 확인: 정상 ${ok}개, 문제 ${bad.size}개, 확인 못 함 ${unknown}개`);
+
+  if (prune && bad.size) {
+    let cut = 0;
+    for (const f of files) {
+      let changed = false;
+      for (const c of f.list(f.json) || []) {
+        const m = c && Array.isArray(c.media) ? c.media[0] : null;
+        if (m && bad.has(m.id)) {
+          delete c.media;
+          changed = true;
+          cut++;
+        }
+      }
+      if (changed) writeJson(f.path, f.json);
+    }
+    console.log(`✂️ 올릴 파일에서 문제 영상 ${cut}곳을 뺐어요 (저장소 원본은 그대로예요)`);
+  }
+}
+
 try {
   if (command === 'validate') validate();
   else if (command === 'merge') merge();
   else if (command === 'recent') recent();
   else if (command === 'check') checkFile(argv[1]);
   else if (command === 'add') add(argv[1]);
+  else if (command === 'verify-media') await verifyMedia();
   else {
-    console.error('사용법: node scripts/content.mjs <validate|merge|recent|check|add> [카드목록.json] [--site site]');
+    console.error('사용법: node scripts/content.mjs <validate|merge|recent|check|add|verify-media> [카드목록.json] [--site site]');
     process.exit(2);
   }
 } catch (e) {

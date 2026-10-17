@@ -713,17 +713,26 @@
   }
 
   // ---------- 사진·영상 ----------
-  // 기사에 실린 사진은 저작권 때문에 쓰지 않아요. 출처로 단 기사에 매체가 직접 실어 둔 유튜브 영상은 미리보기(썸네일)와
+  // 기사에 실린 사진은 저작권 때문에 쓰지 않아요. 소식의 당사자나 방송·언론사가 직접 올린 유튜브 영상은 미리보기(썸네일)와
   // 재생으로 보여주고, 영상이 없는 해설에는 분야별 그림 카드를 보여줘요.
   // 데이터에서 온 값은 믿지 않고, 영상 주소는 11글자 번호로 우리가 직접 만들어요.
   const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
 
+  /** 영상 정보: id, 화면에 쓸 제목(title), 올린 곳을 알리는 글(credit). 데이터가 어긋나 있으면 null */
   function videoOf(c) {
     const list = Array.isArray(c.media) ? c.media : [];
     const m = list.find((x) => x && x.type === 'video' && x.provider === 'youtube' && YOUTUBE_ID.test(String(x.id)));
     if (!m) return null;
+    const id = String(m.id);
+    const channel = typeof m.channel === 'string' ? m.channel.trim().slice(0, 40) : '';
+    if (channel) {
+      // 소식의 당사자(공식 채널)나 방송·언론사가 올린 영상
+      const title = typeof m.title === 'string' && m.title.trim() ? m.title.trim().slice(0, 120) : c.keyword;
+      return { id, title, credit: `${m.kind === 'news' ? '뉴스 영상' : '공식 채널 영상'} · ${channel}` };
+    }
+    // 예전 형식: 출처로 단 기사에 실린 영상
     const src = (c.sources || []).find((s) => s && s.url === m.from);
-    return { id: String(m.id), outlet: src ? String(src.name || '') : '', title: src ? String(src.title || '') : c.keyword };
+    return { id, title: src ? String(src.title || '') : c.keyword, credit: src && src.name ? `${src.name} 기사에 실린 영상` : '관련 영상' };
   }
 
   /** 큰 미리보기 → 보통 미리보기 순서로 시도해요. 둘 다 안 되면 onFail */
@@ -929,7 +938,7 @@
       h(
         'figcaption',
         { class: 'vcap' },
-        h('span', null, v.outlet ? `${v.outlet} 기사에 실린 영상 · YouTube` : '관련 영상 · YouTube'),
+        h('span', null, v.credit),
         h('a', { href: watch, target: '_blank', rel: 'noopener noreferrer' }, 'YouTube에서 보기', icon('out', 14))
       )
     );

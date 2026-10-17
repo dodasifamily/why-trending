@@ -324,6 +324,7 @@ a { color: inherit; }
   line-height: 1.5;
   color: var(--muted);
 }
+.vcap span { min-width: 0; overflow-wrap: anywhere; }
 .vcap a {
   display: inline-flex;
   align-items: center;

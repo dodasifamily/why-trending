@@ -46,6 +46,12 @@ jobs:
       - name: 최근 14일 해설 목록 만들기
         run: node scripts/content.mjs recent
 
+      # 해설에 붙인 유튜브 영상이 지워졌거나 다른 곳에서 재생이 막혔다면, 그 영상만 빼고 올려요(해설 글은 그대로 올라가요).
+      # 유튜브에 물어볼 수 없는 상황이면 아무것도 빼지 않고 건너뛰어요. 이 단계가 실패해도 사이트는 올라가요.
+      - name: 영상 확인 (재생이 안 되는 영상은 빼고 올리기)
+        continue-on-error: true
+        run: node scripts/content.mjs verify-media --prune
+
       - name: GitHub Pages 가 켜져 있는지 확인
         id: check
         env:
