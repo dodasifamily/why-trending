@@ -1,5 +1,5 @@
 {
-  "hours": [9],
-  "dry_run": true,
-  "nonce": "idle-1"
+  "hours": [7, 8, 9],
+  "dry_run": false,
+  "nonce": "test-2"
 }
