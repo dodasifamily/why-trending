@@ -404,20 +404,49 @@
     });
   }
 
+  // ---------- 보던 자리 기억하기 ----------
+  // 오늘·사전 목록에서 해설을 열었다가 뒤로 오면, 떠나기 전에 보던 자리로 돌아와요.
+  // 해설을 열기 직전의 스크롤 위치를 화면 이름별로 기억해 두었다가, 그 화면으로 돌아올 때 되돌려요.
+  // 다른 탭으로 가거나 이미 보고 있는 탭을 다시 누르는 건 새로 시작이라 맨 위에서 보여줘요.
+  const savedScroll = {}; // 화면 이름 → 해설을 열기 직전의 스크롤 위치
+  let shownName = ''; // 지금 화면에 그려져 있는 화면 이름 (today | detail | dict | alerts | pick)
+  let detailFrom = ''; // 지금 열려 있는 해설을 연 화면
+
+  function restoreScroll(y) {
+    view.scrollTop = y;
+    // 글꼴 등이 늦게 자리를 잡아 높이가 바뀌어도 한 번 더 맞춰요 (그 사이 다른 화면으로 가지는 않았을 때만)
+    requestAnimationFrame(() => {
+      if (shownName !== 'detail' && Math.abs(view.scrollTop - y) > 1) view.scrollTop = y;
+    });
+  }
+
   function route(keepScroll) {
     const r = parseRoute();
     updateTabs(r);
+    let restoreTo = 0;
+    if (!keepScroll) {
+      if (r.name === 'detail' && shownName && shownName !== 'detail') {
+        // 목록에서 해설로 들어가요. 아직 이전 화면이 그대로 있어서 지금 보던 자리를 읽을 수 있어요
+        savedScroll[shownName] = view.scrollTop;
+        detailFrom = shownName;
+      } else if (r.name !== 'detail' && shownName === 'detail' && r.name === detailFrom) {
+        // 해설을 열었던 화면으로 돌아와요
+        restoreTo = savedScroll[r.name] || 0;
+      }
+    }
     if (r.name === 'today') renderToday(keepScroll);
     else if (r.name === 'detail') renderDetail(r.id, keepScroll);
     else if (r.name === 'dict') renderDict();
     else if (r.name === 'pick') renderPicker(false);
     else renderAlerts();
+    shownName = r.name;
     if (!keepScroll) {
       try {
         view.focus({ preventScroll: true });
       } catch (e) {
         /* 무시 */
       }
+      if (restoreTo > 0) restoreScroll(restoreTo);
     }
   }
 
