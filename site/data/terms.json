@@ -16,6 +16,16 @@
         "두 매체는 이번 콘셉트가 큐피드, 마법 소녀에 이은 세 번째 '어나더 에고'인 '걸 히어로'라고 소개했어요.",
         "톱스타뉴스는 17일부터 19일까지 서울 아크 강남에서 스포티파이와 함께 팝업을 열고, 19일에 타이틀곡 첫 무대를 공개한다고 전했어요."
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "orvv95kK9sk",
+          "kind": "official",
+          "channel": "IVE",
+          "title": "IVE 아이브 'Looks Can Kill' TEASER #1"
+        }
+      ],
       "sources": [
         {
           "name": "머니투데이",
