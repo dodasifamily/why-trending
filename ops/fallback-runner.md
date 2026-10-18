@@ -53,3 +53,5 @@
    - message: `[매일 06:40 KST 해설 갱신 확인] /home/claude/why-trending 의 ops/fallback-runner.md 를 읽고 그 순서대로 해 줘. 폴더가 없으면 add_repo 로 다시 연결해서 clone 해. 끝에는 같은 메시지로 내일 06:40 KST send_later 를 다시 걸어.`
    - 걸고 나서 `list_triggers` 로 보이는지 확인하면 더 좋아요 (출력이 길어서 꼭 필요할 때만).
 5. **알리기** — 찰리 님께는 **문제가 있을 때만** `SendUserMessage` 로 한국어 해요체 한두 줄로 알려요. 평소 성공에는 알리지 않아요.
+   - 문제로 치는 것: 오늘 카드가 안 올라간 경우, 검사 실패, 그리고 올리기 메모(annotation)에 '영상 자동 찾기를 멈췄어요' 경고가 있는 경우(유튜브 키 오류·검색 한도 초과 등).
+   - 영상 자동 찾기 점검(2026-10-19 에 켜졌어요, 선택): 오늘 올리기 실행의 메모 '영상 자동 찾기 결과·요약'을 `gh api repos/dodasifamily/why-trending/check-runs/<job id>/annotations` 로 한 번 봐요(`gh run list --workflow pages.yml --limit 4` → `gh run view <id> --json jobs`). **오늘 카드에 밈(meme) 카드가 있는데 clips 가 안 붙었다면** 이유 줄을 읽어 보고, 이상하면(예: 오류·엉뚱한 영상) 한 줄로 알려요. 밈 경로는 진짜 키로 아직 한 번도 안 돌았어요(10/19 기준). 못 찾은 이유가 대부분 '허용 채널 아님'이면 정상이에요.
