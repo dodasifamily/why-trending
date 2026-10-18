@@ -1,4 +1,4 @@
-# 왜뜨지? (why-trending)
+# 왜이슈? (why-trending)
 
 요즘 뜨는 밈·신조어가 **왜 뜨는지**를 출처와 함께 30초로 설명해 주는 앱이에요. 안드로이드 앱과 웹 화면이 같은 코드를 써요.
 
@@ -59,7 +59,7 @@
 
 | 무엇 | 언제 | 하는 일 |
 | --- | --- | --- |
-| 해설 갱신 (예약 작업 '왜뜨지 매일 해설 갱신') | 매일 05:50 (한국 시간) | 오늘 화제를 찾아 기사로 확인하고 `site/data/` 의 두 파일(`today.json`, `terms.json`)만 고쳐 올려요 |
+| 해설 갱신 (예약 작업 '왜이슈 매일 해설 갱신') | 매일 05:50 (한국 시간) | 오늘 화제를 찾아 기사로 확인하고 `site/data/` 의 두 파일(`today.json`, `terms.json`)만 고쳐 올려요 |
 | 해설 갱신 확인 (Claude 대화) | 매일 06:40 (한국 시간) | 예약 작업이 실제로 도는지 확인되지 않아서, 대화가 직접 확인하고 오늘 분량이 없으면 `ops/daily-job.md` 대로 올려요 (`ops/fallback-runner.md`) |
 | 사이트 올리기 (`pages.yml`) | `site/` 가 바뀔 때, 매일 06:30 | 해설 검사 → 최근 14일 목록(`recent.json`) 만들기 → GitHub Pages 에 웹 화면과 최신 해설을 올려요. 앱도 여기서 최신 해설을 받아가요 |
 | 앱 만들기 (`android.yml`) | 화면·앱 설정이 바뀔 때 (해설 데이터만 바뀔 때는 안 돌아요) | 시험용 APK 를 만들어 릴리스 `test-latest` 에 올려요. 서명 키를 등록하면 출시용 AAB 도 만들어요. Firebase 설정을 등록해 두었다면 푸시 알림도 켜서 만들어요 |
@@ -69,6 +69,7 @@
   - 새 빌드가 끝나면 이미 있는 공개 릴리스를 **지우지 않고** 파일과 설명(빌드 번호·커밋)만 바꿔요(`scripts/ci-release.sh`). 릴리스가 없을 때만 새로 만들고, 실패하면 최대 4번 다시 해요. 그래서 `published_at` 은 처음 만든 날짜 그대로이고, 최신인지는 파일(asset)의 `updated_at` 과 설명의 빌드 번호로 봐요.
 - 시험용 앱의 서명 키(디버그 키) 파일은 Actions 캐시(`debug-keystore-v2`)에 두고 계속 같은 키로 서명해요 (`app/scripts/patch-android.mjs` 가 Gradle 에 그 경로를 알려줘요). 그래서 새 시험용 앱을 폰에 **덮어 설치**할 수 있어요. 캐시가 7일 넘게 안 쓰여 지워지면 키가 바뀌어서, 그때는 한 번 앱을 지우고 다시 설치해야 해요. 이 키는 비밀 키가 아니고 출시에는 쓰지 않아요 (출시용 키는 GitHub Secrets 에만 둬요).
 - 앱의 영구 ID(패키지 이름): `io.github.dodasifamily.issuewhy` (2026-10-16 확정, `app/capacitor.config.json` 의 `appId` 와 `server.hostname`). 구글 플레이에 처음 올리면 바꿀 수 없어요. 문의 이메일은 `issuewhyhelp@gmail.com` (`site/js/config.js` 의 `report.email`, 개인정보처리방침).
+- 앱 이름: **왜이슈?** (2026-10-18 에 '왜뜨지?' 에서 바꿨어요). 화면에 보이는 이름은 `site/js/app.js`·`site/index.html`·`site/privacy.html`, 폰 홈 화면에 보이는 이름은 `app/capacitor.config.json` 의 `appName` 이에요(새 시험용 앱을 설치해야 바뀌어요). 저장소 이름(`why-trending`)·사이트 주소·앱 ID·시험용 앱 파일 이름(`whyttuji-test.apk`)과 코드 안의 `whyttuji` 이름은 그대로 둬요. 해설 화면의 '왜 뜨지?' 는 앱 이름이 아니라 "왜 뜨는지" 묻는 문구예요.
 - GitHub Pages 는 켜져 있어요 (Source = GitHub Actions). 사이트 주소: https://dodasifamily.github.io/why-trending/
 - 출시용 서명 키: Settings → Secrets and variables → Actions 에 `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` 를 등록해요.
 - 광고: `site/js/config.js` 의 `ads` 와 `app/app.config.json` 의 AdMob 앱 ID 는 지금 구글 테스트 값이에요. 출시 전에 실제 값으로 바꿔요.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 왜뜨지 콘텐츠 도구 (외부 패키지 없이 Node만으로 동작해요)
+// 왜이슈 콘텐츠 도구 (외부 패키지 없이 Node만으로 동작해요)
 //
 //   node scripts/content.mjs validate   categories.json / today.json / terms.json 규칙 검사 (어기면 종료 코드 1)
 //   node scripts/content.mjs merge      today.json 의 카드를 terms.json(사전)에 합치기

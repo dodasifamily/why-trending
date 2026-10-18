@@ -1,4 +1,4 @@
-/* 왜뜨지 – 화면과 동작 (프레임워크 없이 작성) */
+/* 왜이슈 – 화면과 동작 (프레임워크 없이 작성) */
 (() => {
   'use strict';
 
@@ -455,7 +455,7 @@
     return h(
       'div',
       { class: 'brandrow' },
-      h('div', { class: 'brand' }, '왜뜨지', h('span', null, '?')),
+      h('div', { class: 'brand' }, '왜이슈', h('span', null, '?')),
       h('div', { class: 'date' }, dateText || '')
     );
   }
@@ -518,7 +518,7 @@
   }
 
   function renderToday(keepScroll) {
-    document.title = '왜뜨지? – 요즘 뜨는 말, 30초 해설';
+    document.title = '왜이슈? – 요즘 뜨는 말, 30초 해설';
     if (S.today && needsPick()) return renderPicker(true); // 처음 실행하면 관심 분야부터 골라요
     const nodes = [brandRow(S.today ? koDate(S.today.date) : ''), h('h1', { class: 'hero' }, '요즘 뜨는 말,', h('br'), h('span', { class: 'hl' }, '30초 해설'))];
 
@@ -553,7 +553,7 @@
   // ---------- 관심 분야 고르기 ----------
   // first=true: 처음 실행했을 때 오늘 화면 자리에서 보여줘요. false: '바꾸기'를 눌러 들어온 화면(#/pick)
   function renderPicker(first) {
-    document.title = first ? '왜뜨지? – 관심 분야 고르기' : '내 분야 – 왜뜨지?';
+    document.title = first ? '왜이슈? – 관심 분야 고르기' : '내 분야 – 왜이슈?';
     if (!S.groups) {
       setView([
         h('div', { class: 'topbar' }, h('button', { class: 'back', type: 'button', onclick: backToList }, icon('left', 22), '뒤로')),
@@ -663,7 +663,7 @@
     if (!rep.endpoint && rep.email) {
       // 접수 폼이 없으면 메일 앱을 열어 신고 내용을 미리 적어 줘요.
       // 실제로 보냈는지는 알 수 없어서 '완료'로 표시하지는 않아요.
-      const subject = `[왜뜨지 신고] ${c.keyword}`;
+      const subject = `[왜이슈 신고] ${c.keyword}`;
       const body = [`해설: ${c.keyword} (${c.id})`, `날짜: ${c.date}`, `버전: v${CFG.appVersion || ''} ${NATIVE ? 'app' : 'web'}`, '', '어느 부분이 이상한가요?', ''].join('\n');
       S.reportState[c.id] = 'mail';
       redraw();
@@ -812,7 +812,7 @@
     return section(
       '더 찾아보기',
       h('div', { class: 'finds' }, link(`https://www.youtube.com/results?search_query=${q}`, '유튜브에서 찾기'), link(`https://www.google.com/search?tbm=isch&safe=active&q=${q}`, '이미지로 찾기')),
-      h('p', { class: 'note', style: 'margin:8px 4px 0' }, '바깥 서비스의 검색 결과예요. 거기에 보이는 영상·이미지는 왜뜨지?와 관계없어요.')
+      h('p', { class: 'note', style: 'margin:8px 4px 0' }, '바깥 서비스의 검색 결과예요. 거기에 보이는 영상·이미지는 왜이슈?와 관계없어요.')
     );
   }
 
@@ -993,7 +993,7 @@
     }
     // 데이터를 새로 받아 화면을 다시 그릴 때, 같은 해설에서 영상이 재생 중이면 그대로 두어요
     if (keepScroll && view.getAttribute('data-card-id') === c.id && view.querySelector('.vframe iframe')) return;
-    document.title = `${c.keyword} – 왜뜨지?`;
+    document.title = `${c.keyword} – 왜이슈?`;
     const nodes = [
       h(
         'div',
@@ -1023,7 +1023,7 @@
   }
 
   function renderDict() {
-    document.title = '사전 – 왜뜨지?';
+    document.title = '사전 – 왜이슈?';
     if (S.termsState !== 'ok') {
       if (S.termsState === 'error') S.termsState = 'idle'; // 다시 들어오면 한 번 더 시도해요
       loadTerms().then(() => view.contains(list) && drawList());
@@ -1279,7 +1279,7 @@
   }
 
   function renderAlerts() {
-    document.title = '알림 – 왜뜨지?';
+    document.title = '알림 – 왜이슈?';
     const canNotify = !!plugin('LocalNotifications');
     const push = !!fcm();
 

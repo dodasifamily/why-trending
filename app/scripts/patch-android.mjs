@@ -70,7 +70,7 @@ const vcRe = /versionCode\s*=?\s*\d+/;
 const vnRe = /versionName\s*=?\s*"[^"]*"/;
 if (!vcRe.test(gradle) || !vnRe.test(gradle)) throw new Error('build.gradle 에서 versionCode/versionName 을 찾지 못했어요');
 gradle = gradle.replace(vcRe, `versionCode ${versionCode}`).replace(vnRe, `versionName "${versionName}"`);
-const SIGN_MARK = '// ---- 왜뜨지: 시험용 서명 키 고정 ----';
+const SIGN_MARK = '// ---- 왜이슈: 시험용 서명 키 고정 ----';
 if (!gradle.includes(SIGN_MARK)) {
   // 환경 변수 WHYTTUJI_DEBUG_KEYSTORE 에 키 파일 경로가 있으면 시험용(디버그) 앱을 그 키로 서명해요. 없으면 기본 동작이에요.
   // 빌드마다 같은 키여야 폰에서 새 시험용 앱을 지우지 않고 덮어 설치할 수 있어요. (출시용 키가 아니에요)
@@ -114,7 +114,7 @@ fs.writeFileSync(
 // (prepare-fcm.mjs 가 파일을 검사하고 부품을 넣었을 때만 파일이 있어요. 없으면 이 구역은 건너뛰어요.)
 const fcmJson = path.join(appDir, 'google-services.json');
 const fcmOn = fs.existsSync(fcmJson);
-const FCM_MARK = '// ---- 왜뜨지: 푸시 알림(FCM) ----';
+const FCM_MARK = '// ---- 왜이슈: 푸시 알림(FCM) ----';
 if (fcmOn) {
   // (a) Firebase 설정 파일을 앱 폴더로
   fs.copyFileSync(fcmJson, path.join(androidDir, 'app', 'google-services.json'));

@@ -16,7 +16,7 @@ set -euo pipefail
 TAG="test-latest"
 REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY 가 없어요}"
 TARGET="${GITHUB_REF_NAME:-main}"
-TITLE="왜뜨지 시험용 앱 (최신)"
+TITLE="왜이슈 시험용 앱 (최신)"
 APK="$(ls app/android/app/build/outputs/apk/debug/*.apk | head -n 1)"
 cp "$APK" whyttuji-test.apk
 LOCAL_SIZE="$(wc -c < whyttuji-test.apk | tr -d ' ')"

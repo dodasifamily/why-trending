@@ -1,6 +1,6 @@
 {
   "appId": "io.github.dodasifamily.issuewhy",
-  "appName": "왜뜨지",
+  "appName": "왜이슈?",
   "webDir": "www",
   "server": {
     "androidScheme": "https",
