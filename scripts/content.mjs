@@ -3,7 +3,7 @@
 //
 //   node scripts/content.mjs validate   categories.json / today.json / terms.json 규칙 검사 (어기면 종료 코드 1)
 //   node scripts/content.mjs merge      today.json 의 카드를 terms.json(사전)에 합치기
-//   node scripts/content.mjs recent     최근 2주 해설을 분야마다 7개까지 모은 recent.json 만들기 (사이트·앱을 올릴 때 자동으로 만들어져요. 저장소에는 올리지 않아요)
+//   node scripts/content.mjs recent     최근 3일(오늘 기준 2일 전까지) 이슈 해설을 모은 recent.json 만들기 (사이트·앱을 올릴 때 자동으로 만들어져요. 저장소에는 올리지 않아요)
 //   node scripts/content.mjs check <카드목록.json>   새 카드 후보 파일이 규칙에 맞는지만 검사 (사전·today 는 건드리지 않아요)
 //   node scripts/content.mjs add <카드목록.json>     검사를 통과한 지난 카드를 사전(terms.json)에만 추가 (오늘 카드는 today.json + merge 로 올려요)
 //   node scripts/content.mjs verify-media [--prune]  카드에 붙인 유튜브 영상이 실제로 있고 다른 곳에서 재생이 허용되는지 유튜브에 물어봐요
@@ -35,21 +35,22 @@ const RECENT_PATH = join(siteDir, 'data', 'recent.json');
 let GROUPS = [];
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 // 하루 카드는 여러 분야에 골고루 있어야 '내 분야' 만 골라 본 사람도 매일 볼 거리가 있어요.
-// 앱은 고른 분야마다 오늘 해설 + 최근 2주 해설을 합쳐 최대 FEED_MAX_PER_GROUP 개를 보여줘요. 그래서 분야마다 하루 1~2개씩 꾸준히 쌓여야 해요.
+// 2026-10-19 사용자 요청: 앱은 '오늘 기준 2일 전'까지의 이슈만 보여줘요 (오늘·어제·그저께 = 3일). 그보다 오래된 이슈는 어디서도 보여주지 않아요.
+// 앱은 고른 분야마다 그 3일 안의 해설을 최신 순으로 최대 FEED_MAX_PER_GROUP 개 보여줘요. 그래서 분야마다 하루 1~2개씩 꾸준히 쌓여야 해요.
 const MIN_CARDS_PER_DAY = 7;
 const MAX_CARDS_PER_DAY = 14;
 const MIN_GROUPS_PER_DAY = 5; // 하루 카드가 걸쳐야 하는 서로 다른 분야 수
 const MAX_PER_GROUP_PER_DAY = 4; // 한 분야가 하루 카드를 독차지하지 않게
-const RECENT_DAYS = 14; // 앱 분야별 목록에 쓰는 지난 해설 기간 (오늘 포함 14일)
-const FEED_MAX_PER_GROUP = 7; // 앱이 분야마다 보여주는 최대 개수 (recent.json 도 분야마다 이만큼만 담아요)
-const FEED_MIN_PER_GROUP = 5; // 분야마다 최근 RECENT_DAYS 일 안에 이만큼은 있어야 해요 (모자라면 validate 가 알려줘요)
+const RECENT_DAYS = 3; // 앱이 보여주는 기간 (오늘 포함 3일 = 오늘 기준 2일 전까지). 앱 화면(site/js/app.js 의 FEED_DAYS)과 같은 값이에요
+const FEED_MAX_PER_GROUP = 7; // 앱 첫 화면이 분야마다 보여주는 최대 개수 (app.js 의 FEED_MAX 와 같은 값. recent.json 은 기간 안의 해설을 모두 담아요)
+const FEED_MIN_PER_GROUP = 2; // 분야마다 최근 RECENT_DAYS 일 안에 이만큼은 있어야 해요 (모자라면 validate 가 알려줘요)
 // '오늘 뜨는' 소식이 며칠 전·지난달 기사에 기대지 않게 해요. 아래 일수는 모두 카드 날짜(date) 기준이에요.
 //  - 모든 출처가 MAX_SOURCE_AGE_DAYS 일 안에 나온 기사여야 해요.
 //  - 가장 최근 출처는 NEWEST_SOURCE_MAX_DAYS 일 안(카드 날짜 당일~전날)에 나온 기사여야 해요.
 //  - FRESH_SOURCE_DAYS 일 안에 나온 기사가 서로 다른 매체 MIN_FRESH_OUTLETS 곳 이상이어야 해요.
 // 유행어·밈(meme 분야)은 기사가 드문드문 올라와서 기준을 조금 넓혀요 (MEME_*).
 // 오늘 카드와 `check`/`add` 후보에는 이 기준이 에러로 적용돼요. 사전(terms.json)에 이미 있는 카드는 지우지 않지만,
-// 이 기준을 못 넘으면 앱의 '최근 2주' 목록(recent.json)에서는 빠져요 (사전 화면에는 그대로 있어요).
+// 이 기준을 못 넘으면 앱의 '최근 3일' 목록(recent.json)에서는 빠져요 (사전 terms.json 에는 그대로 남아요).
 const MAX_SOURCE_AGE_DAYS = 14;
 const NEWEST_SOURCE_MAX_DAYS = 1;
 const FRESH_SOURCE_DAYS = 3;
@@ -113,6 +114,8 @@ function normName(s) {
 const NEWS_CHANNEL_KEYS = new Set(NEWS_CHANNELS.map(normName));
 
 // 다루지 않기로 한 주제의 단서가 되는 말들이에요. 걸리면 그 카드는 빼거나 다시 써야 해요.
+// 2026-10-19 '화제 이슈 중심' 개편: 큰 시위·집회·파업(국내외)은 사실만 전하는 조건으로 다루기로 해서 '시위'·'집회'·'파업'은 뺐어요.
+// 정당·정치인 공방, 범죄·사건사고·사망, 전쟁·테러·북한 군사 소식은 그대로 다루지 않아요.
 const BLOCKED_WORDS = [
   // 정치·선거
   '대통령', '국회', '의원', '정당', '여당', '야당', '탄핵', '선거', '총선', '대선', '민주당', '국민의힘', '정부 비판',
@@ -121,8 +124,20 @@ const BLOCKED_WORDS = [
   '사망', '숨져', '숨진', '별세', '부고', '자살', '극단적 선택', '살인', '폭행', '성폭행', '성추행', '성범죄', '마약',
   '불륜', '학교폭력', '학폭', '참사', '화재', '붕괴', '추락', '교통사고',
   // 갈등·분쟁
-  '시위', '집회', '파업', '전쟁', '테러', '북한', '미사일'
+  '전쟁', '테러', '북한', '미사일'
 ];
+// 위 금지어가 들어 있어도 괜찮은 정해진 표현이에요. 이 표현을 지운 뒤에 금지어를 찾아요.
+//  - '경찰 추산': 집회·시위 규모를 전할 때 쓰는 말이에요. 그 밖의 '경찰' 이야기(수사·체포 등)는 계속 걸러요.
+const BLOCKED_OK_PHRASES = ['경찰 추산', '경찰추산'];
+
+// 이슈 해설은 '확인된 사실만 담담하게' 써요 (2026-10-19). 카드 글(keyword·line·meaning·why·example)에 이런 말이 있으면 걸러요.
+// 출처 기사 제목에는 적용하지 않아요(매체가 쓴 제목을 그대로 적는 것이라서요).
+//  - 자극적인 표현: 사실이 아니라 감정을 앞세우는 말
+//  - 투자 권유로 읽힐 수 있는 표현: 증시·환율 같은 시장 지표의 큰 변동은 사실만 전하고, 종목 추천·띄우기·전망은 쓰지 않아요
+const TONE_WORDS = {
+  '자극적인 표현': ['충격', '경악', '발칵', '폭로', '멘붕', '아수라장'],
+  '투자 권유로 읽힐 수 있는 표현': ['수혜주', '관련주', '테마주', '목표주가', '목표가', '투자의견', '추천주', '종목 추천', '매수 추천', '매도 추천', '매수 의견']
+};
 
 const errors = [];
 const err = (where, msg) => errors.push(`${where}: ${msg}`);
@@ -159,8 +174,26 @@ function checkString(where, field, value, min, max) {
 }
 
 function scanBlocked(where, label, text) {
+  let t = text;
+  for (const p of BLOCKED_OK_PHRASES) t = t.split(p).join(' ');
   for (const w of BLOCKED_WORDS) {
-    if (text.includes(w)) err(where, `${label} 에 다루지 않는 주제의 단서 '${w}' 가 있어요`);
+    if (t.includes(w)) err(where, `${label} 에 다루지 않는 주제의 단서 '${w}' 가 있어요`);
+  }
+}
+
+// 금지어가 들어 있는지만 true/false 로 (영상 제목·채널 이름을 걸러낼 때 써요)
+function hasBlockedWord(text) {
+  let t = String(text || '');
+  for (const p of BLOCKED_OK_PHRASES) t = t.split(p).join(' ');
+  return BLOCKED_WORDS.some((w) => t.includes(w));
+}
+
+// 카드 글의 어조 검사 (자극적인 표현·투자 권유로 읽히는 표현). 사실만 담담하게 쓰는 규칙이에요.
+function scanTone(where, label, text) {
+  for (const [kind, words] of Object.entries(TONE_WORDS)) {
+    for (const w of words) {
+      if (text.includes(w)) err(where, `${label} 에 ${kind} '${w}' 가 있어요 (이슈 해설은 확인된 사실만 담담하게 써요)`);
+    }
   }
 }
 
@@ -259,9 +292,18 @@ function validateCard(card, where) {
   }
 
   for (const f of ['keyword', 'line', 'meaning', 'example']) {
-    if (typeof card[f] === 'string') scanBlocked(where, f, card[f]);
+    if (typeof card[f] === 'string') {
+      scanBlocked(where, f, card[f]);
+      scanTone(where, f, card[f]);
+    }
   }
-  if (Array.isArray(card.why)) card.why.forEach((w, i) => typeof w === 'string' && scanBlocked(where, `why[${i}]`, w));
+  if (Array.isArray(card.why)) {
+    card.why.forEach((w, i) => {
+      if (typeof w !== 'string') return;
+      scanBlocked(where, `why[${i}]`, w);
+      scanTone(where, `why[${i}]`, w);
+    });
+  }
 
   validateMedia(card, where);
   validateClips(card, where);
@@ -490,13 +532,13 @@ function validate() {
   }
   console.log(`✅ 콘텐츠 검사 통과: 분야 ${GROUPS.length}개, 오늘 ${today.cards.length}개, 사전 ${terms.terms.length}개`);
 
-  // 통과해도 알려주는 참고 사항(실패는 아니에요): 최근 2주 동안 해설이 모자란 분야
+  // 통과해도 알려주는 참고 사항(실패는 아니에요): 최근 3일 동안 해설이 모자란 분야
   if (isRealDate(today.date)) {
     const from = shiftDate(today.date, -(RECENT_DAYS - 1));
     const count = {};
     const inWindow = terms.terms.filter((c) => c.date >= from && c.date <= today.date);
     const stale = inWindow.filter((c) => freshnessProblems(c).length);
-    // 출처가 오래된 해설은 앱의 '최근 2주' 목록(recent.json)에서 빠지니까 개수에도 넣지 않아요
+    // 출처가 오래된 해설은 앱의 '최근 3일' 목록(recent.json)에서 빠지니까 개수에도 넣지 않아요
     for (const c of inWindow) if (!stale.includes(c)) count[c.group] = (count[c.group] || 0) + 1;
     if (stale.length) {
       console.log(`⚠️ 최근 ${RECENT_DAYS}일 안이지만 출처가 오래돼 앱 목록에서 빠지는 해설 ${stale.length}개 (사전에는 남아요):`);
@@ -531,7 +573,8 @@ function merge() {
   console.log(`✅ 사전에 합쳤어요: 총 ${terms.terms.length}개`);
 }
 
-// 앱 첫 화면의 분야별 목록에 쓰는 파일을 만들어요. 사전(terms.json)은 계속 커지니까, 최근 2주 해설을 분야마다 최신순 7개까지만 담아요.
+// 앱이 보여주는 이슈 목록 파일을 만들어요. 사전(terms.json)은 계속 커지니까, '오늘 기준 2일 전'까지(RECENT_DAYS 일) 해설만 최신순으로 모두 담아요.
+// 앱 첫 화면의 분야별 목록과 '검색' 화면이 모두 이 파일을 써요. 앱 화면도 같은 기간만 보여줘서(app.js 의 FEED_DAYS), 기간이 지난 해설은 어디서도 안 보여요.
 // today.json 의 날짜를 기준으로 하고, 사전에서 파생되는 파일이라 저장소에는 올리지 않고 올릴 때마다 새로 만들어요.
 function recent() {
   const today = readJson(TODAY_PATH);
@@ -544,20 +587,14 @@ function recent() {
     .map((c, idx) => ({ c, idx }))
     .filter((x) => x.c.date >= from && x.c.date <= today.date)
     .sort((a, b) => (a.c.date < b.c.date ? 1 : a.c.date > b.c.date ? -1 : a.idx - b.idx));
-  // 며칠 전·지난달 기사에 기댄 해설은 '최근 2주' 목록에 올리지 않아요 (사전에는 그대로 있어요)
+  // 며칠 전·지난달 기사에 기댄 해설은 '최근 3일' 목록에 올리지 않아요 (사전에는 그대로 있어요)
   const inWindow = inRange.filter((x) => freshnessProblems(x.c).length === 0);
   if (inWindow.length < inRange.length) {
     console.log(`ℹ️ 출처가 오래돼 최근 목록에서 뺀 해설 ${inRange.length - inWindow.length}개: ${inRange.filter((x) => !inWindow.includes(x)).map((x) => x.c.id).join(', ')}`);
   }
-  const perGroup = {};
-  const cards = inWindow
-    .filter((x) => {
-      perGroup[x.c.group] = (perGroup[x.c.group] || 0) + 1;
-      return perGroup[x.c.group] <= FEED_MAX_PER_GROUP;
-    })
-    .map((x) => x.c);
-  writeJson(RECENT_PATH, { schema: 1, updatedAt: today.updatedAt, days: RECENT_DAYS, perGroup: FEED_MAX_PER_GROUP, cards });
-  console.log(`✅ 최근 ${RECENT_DAYS}일 해설 ${cards.length}개(분야마다 최대 ${FEED_MAX_PER_GROUP}개)를 recent.json 에 담았어요 (${from} ~ ${today.date})`);
+  const cards = inWindow.map((x) => x.c);
+  writeJson(RECENT_PATH, { schema: 1, updatedAt: today.updatedAt, days: RECENT_DAYS, cards });
+  console.log(`✅ 최근 ${RECENT_DAYS}일 해설 ${cards.length}개를 recent.json 에 담았어요 (${from} ~ ${today.date})`);
 }
 
 // 새 카드 후보 파일(JSON 배열)을 규칙에 맞춰 검사해요. 사전·today 는 읽기만 하고, 통과한 카드 목록을 돌려줘요.
@@ -910,7 +947,7 @@ function evaluateVideo(it, card, mode) {
   if (seconds === null || seconds < FIND_MIN_SECONDS || seconds > (mode === 'news' ? FIND_NEWS_MAX_SECONDS : FIND_CLIP_MAX_SECONDS)) return { why: '길이' };
   const published = Date.parse(sn.publishedAt);
   if (!Number.isFinite(published)) return { why: '올린 날 없음' };
-  if (BLOCKED_WORDS.some((w) => title.includes(w) || channel.includes(w))) return { why: '금지어' };
+  if (hasBlockedWord(title) || hasBlockedWord(channel)) return { why: '금지어' };
   if (VIDEO_TITLE_BLOCKED.test(title) || VIDEO_TITLE_BLOCKED.test(channel)) return { why: '반응·모음·자극적인 제목' };
   const fit = keywordFit(card, title, mode);
   if (!fit) return { why: '제목에 키워드 없음' };
