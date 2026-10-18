@@ -47,8 +47,8 @@
     cats: cleanCats(store.get('cats', null)), // 내가 고른 분야 id 목록. null 이면 아직 고르지 않은 거예요(첫 실행)
     rev: 0, // 지금 받은 분야 목록의 구성 번호 (categories.json 의 revision)
     revNotice: false, // 분야 구성이 새로 바뀐 직후 한 번, 옛 선택을 새 분야로 옮겼다고 알리고 다시 고르게 해요
-    recent: null, // 최근 14일 해설 (recent.json)
-    dictGroup: 'all', // 사전에서 보고 있는 분야 ('all' = 전체)
+    recent: null, // 최근 3일 해설 (recent.json)
+    dictGroup: 'all', // 검색 화면에서 보고 있는 분야 ('all' = 전체)
     alertOn: store.get('alertOn', false) === true,
     hour: HOURS.includes(store.get('hour', 8)) ? store.get('hour', 8) : 8,
     alertMsg: '',
@@ -162,10 +162,15 @@
     const m = YMD.exec(s || '');
     return m ? `${m[1]}.${m[2]}.${m[3]}` : '';
   }
-  function localYmd() {
-    const d = new Date();
-    const p = (n) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  /** 한국 시간 기준 날짜 (해설의 날짜도 한국 시간으로 적어요) */
+  function kstYmd(ms) {
+    return new Date(ms + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  }
+  /** 오늘 날짜(한국 시간). 기기 시계가 해설의 최신 날짜보다 뒤처져 있으면 해설의 최신 날짜를 오늘로 봐요 */
+  function todayYmd() {
+    const now = kstYmd(Date.now());
+    const latest = S.today && typeof S.today.date === 'string' && YMD.test(S.today.date) ? S.today.date : '';
+    return latest > now ? latest : now;
   }
   function daysApart(a, b) {
     const x = parseYmd(a);
@@ -212,7 +217,7 @@
       });
   }
 
-  /** 오늘 해설·분야 목록·최근 14일 해설을 한꺼번에 새로 받아요. 하나가 안 와도 나머지는 그대로 써요 */
+  /** 오늘 해설·분야 목록·최근 3일 해설을 한꺼번에 새로 받아요. 하나가 안 와도 나머지는 그대로 써요 */
   function refreshData(showLoading) {
     if (showLoading && !S.today) {
       S.todayState = 'loading';
@@ -250,8 +255,12 @@
       const r = parseRoute().name;
       if (hadGroups && view.querySelector('.pickrow')) return; // 분야를 고르는 중이에요
       if (r === 'today' || r === 'detail') route(true);
-      // 분야 목록을 처음 받았을 때만 다시 그려요 (사전에서 글자를 치는 중이거나 분야를 고르는 중에 화면이 바뀌지 않게)
-      else if (!hadGroups && S.groups && (r === 'pick' || r === 'alerts' || (r === 'dict' && !isTypingQuery()))) route(true);
+      // 검색 화면은 글자를 치는 중이 아닐 때만 다시 그려요 (치는 도중에 화면이 바뀌지 않게)
+      else if (r === 'dict') {
+        if (!isTypingQuery()) route(true);
+      }
+      // 분야 목록을 처음 받았을 때만 다시 그려요 (분야를 고르는 중에 화면이 바뀌지 않게)
+      else if (!hadGroups && S.groups && (r === 'pick' || r === 'alerts')) route(true);
     });
   }
 
@@ -261,7 +270,7 @@
   }
 
   let termsPromise = null;
-  /** 사전 파일을 한 번만 받아 와요. 여러 화면이 동시에 부탁해도 같은 약속(Promise)을 같이 기다려요 */
+  /** 지난 해설 보관함(terms.json)을 한 번만 받아 와요. 최근 3일이 지나 목록에서 빠진 해설을 링크로 열 때만 써요. 여러 화면이 동시에 부탁해도 같은 약속(Promise)을 같이 기다려요 */
   function loadTerms() {
     if (termsPromise) return termsPromise;
     S.termsState = 'loading';
@@ -304,8 +313,8 @@
   /** 내가 고른 분야 (분야 목록에 없는 id 는 빼요). 아직 안 골랐으면 null */
   function myCats() {
     if (!S.groups || !S.cats) return null;
-    const ids = groupIds();
-    const mine = S.cats.filter((id) => ids.includes(id));
+    // 분야 목록(categories.json)의 지금 순서대로 보여줘요 (순서를 바꿔도 이미 고른 사람에게 바로 적용돼요)
+    const mine = groupIds().filter((id) => S.cats.includes(id));
     return mine.length ? mine : null;
   }
   function needsPick() {
@@ -361,11 +370,12 @@
   }
 
   // ---------- 분야별 목록 ----------
-  // 분야마다 '오늘 + 최근 2주' 해설을 최신 순으로 최대 FEED_MAX 개 보여줘요 (scripts/content.mjs 의 FEED_MAX_PER_GROUP 과 같은 값)
+  // 오늘 기준 2일 전까지(오늘·어제·그저께, 모두 3일)의 이슈만 보여줘요 (2026-10-19 사용자 요청). 분야마다 최신 순으로 최대 FEED_MAX 개.
+  // scripts/content.mjs 의 RECENT_DAYS·FEED_MAX_PER_GROUP 과 같은 값이에요. 이 기간이 지난 해설은 목록·검색 어디에도 나오지 않아요.
   const FEED_MAX = 7;
-  const FEED_DAYS = 14;
+  const FEED_DAYS = 3;
 
-  /** 오늘 해설과 최근 해설을 합쳐서 (같은 id 는 오늘 쪽 하나만) 최신 날짜 순으로 */
+  /** 오늘 해설과 최근 해설을 합쳐서 (같은 id 는 오늘 쪽 하나만) 오늘 기준 FEED_DAYS 일 안의 것만, 최신 날짜 순으로 */
   function feedCards() {
     const seen = new Set();
     const out = [];
@@ -376,14 +386,14 @@
     };
     if (S.today) S.today.cards.forEach(add);
     if (S.recent) S.recent.cards.forEach(add);
-    const base = S.today ? S.today.date : localYmd();
-    return out.filter((c) => daysApart(c.date, base) < FEED_DAYS).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    const base = todayYmd();
+    return out.filter((c) => parseYmd(c.date) && daysApart(c.date, base) < FEED_DAYS).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }
 
   /** 내 분야마다 하나씩. 분야 목록에 없는 분야의 해설은 '기타'로, 분야 목록을 못 받았으면 한 목록으로 */
   function feedSections() {
     const all = feedCards();
-    if (!S.groups) return [{ id: '', label: '최근 해설', cards: all.slice(0, FEED_MAX * 2) }];
+    if (!S.groups) return [{ id: '', label: '최근 이슈', cards: all.slice(0, FEED_MAX * 2) }];
     const ids = groupIds();
     const secs = (myCats() || ids).map((id) => ({ id, label: groupOf(id).label, cards: all.filter((c) => c.group === id).slice(0, FEED_MAX) }));
     const other = all.filter((c) => !ids.includes(c.group)).slice(0, FEED_MAX);
@@ -391,11 +401,12 @@
     return secs;
   }
 
-  /** 해설 날짜를 짧게: 오늘 / 어제 / 10월 14일 */
+  /** 해설 날짜를 짧게: 오늘 / 어제 / 그저께 / 10월 14일 */
   function dayText(s) {
-    const now = localYmd();
+    const now = todayYmd();
     if (s === now) return '오늘';
     if (daysApart(s, now) === 1) return '어제';
+    if (daysApart(s, now) === 2) return '그저께';
     const d = parseYmd(s);
     return d ? `${d.getMonth() + 1}월 ${d.getDate()}일` : '';
   }
@@ -434,7 +445,7 @@
   }
 
   // ---------- 보던 자리 기억하기 ----------
-  // 오늘·사전 목록에서 해설을 열었다가 뒤로 오면, 떠나기 전에 보던 자리로 돌아와요.
+  // 오늘·검색 목록에서 해설을 열었다가 뒤로 오면, 떠나기 전에 보던 자리로 돌아와요.
   // 해설을 열기 직전의 스크롤 위치를 화면 이름별로 기억해 두었다가, 그 화면으로 돌아올 때 되돌려요.
   // 다른 탭으로 가거나 이미 보고 있는 탭을 다시 누르는 건 새로 시작이라 맨 위에서 보여줘요.
   const savedScroll = {}; // 화면 이름 → 해설을 열기 직전의 스크롤 위치
@@ -504,16 +515,16 @@
       h('span', { class: 'ctop' }, catPill(c), dayTag(c.date)),
       h('span', { class: 'kw' }, h('span', { class: 'hl' }, c.keyword)),
       h('span', { class: 'ln' }, c.line),
-      h('span', { class: 'more' }, h('span', null, '왜 뜨지? 보기'), icon('right'))
+      h('span', { class: 'more' }, h('span', null, '왜 화제인지 보기'), icon('right'))
     );
   }
 
-  /** 목록용 작은 카드. 사전에서는 분야 점 + 세부 분류, 분야별 목록에서는 세부 분류 + 날짜 */
-  function termRow(c, withDate) {
+  /** 목록용 작은 카드. 분야별 목록에서는 세부 분류 + 날짜, 검색 화면에서는 분야 점(withDot)도 같이 */
+  function termRow(c, withDate, withDot) {
     return h(
       'button',
       { class: 'term', type: 'button', onclick: () => go('/t/' + encodeURIComponent(c.id)) },
-      h('span', { class: 'row' }, h('span', { class: 'nm' }, c.keyword), withDate ? h('span', { class: 'tg' }, h('span', { class: 'tcat' }, c.cat), dayTag(c.date)) : h('span', { class: 'tg' }, gdot(c.group), c.cat)),
+      h('span', { class: 'row' }, h('span', { class: 'nm' }, c.keyword), withDate ? h('span', { class: 'tg' }, withDot ? gdot(c.group) : null, h('span', { class: 'tcat' }, c.cat), dayTag(c.date)) : h('span', { class: 'tg' }, gdot(c.group), c.cat)),
       h('span', { class: 'ml', style: 'display:block' }, c.line)
     );
   }
@@ -527,7 +538,7 @@
       h('div', { class: 'sechead' }, h('h2', { class: 'sech' }, sec.id ? gdot(sec.id) : null, h('span', null, labelNodes(sec.label))), items.length ? h('span', { class: 'secn' }, items.length + '개') : null),
       items.length
         ? [cardButton(items[0]), items.length > 1 ? h('div', { class: 'tlist' }, items.slice(1).map((c) => termRow(c, true))) : null]
-        : h('p', { class: 'secnone' }, '최근 2주 동안 올라온 해설이 아직 없어요.')
+        : h('p', { class: 'secnone' }, `최근 ${FEED_DAYS}일 동안 올라온 이슈가 아직 없어요.`)
     );
   }
 
@@ -547,13 +558,13 @@
   }
 
   function renderToday(keepScroll) {
-    document.title = '왜이슈? – 요즘 뜨는 말, 30초 해설';
+    document.title = '왜이슈? – 지금 화제인 이슈, 30초 해설';
     if (S.today && needsPick()) return renderPicker(true); // 처음 실행하면 관심 분야부터 골라요
     if (S.today && S.revNotice && myCats()) {
       S.revNotice = false; // 분야가 바뀐 걸 알리는 화면은 한 번만 보여줘요
       return renderPicker(false, true);
     }
-    const nodes = [brandRow(S.today ? koDate(S.today.date) : ''), h('h1', { class: 'hero' }, '요즘 뜨는 말,', h('br'), h('span', { class: 'hl' }, '30초 해설'))];
+    const nodes = [brandRow(S.today ? koDate(S.today.date) : ''), h('h1', { class: 'hero' }, '지금 화제인 이슈,', h('br'), h('span', { class: 'hl' }, '30초 해설'))];
 
     if (!S.today) {
       if (S.todayState === 'error') nodes.push(errorBox('해설을 불러오지 못했어요', '인터넷 연결을 확인하고 다시 시도해 주세요.', () => refreshData(true)));
@@ -563,17 +574,21 @@
       nodes.push(h('p', { class: 'note', role: 'status' }, '해설을 불러오고 있어요…'));
     } else {
       const secs = feedSections();
-      if (daysApart(S.today.date, localYmd()) >= 2) nodes.push(h('p', { class: 'stale', role: 'status' }, '업데이트가 조금 늦어지고 있어요. 지난 해설을 보여드려요.'));
+      const late = daysApart(S.today.date, todayYmd()) >= 2;
+      if (late) nodes.push(h('p', { class: 'stale', role: 'status' }, '업데이트가 조금 늦어지고 있어요. 새 이슈가 올라오면 바로 보여드릴게요.'));
       nodes.push(myCatsRow());
       if (secs.some((s) => s.cards.length)) {
         secs.forEach((s) => nodes.push(sectionNode(s)));
+      } else if (!feedCards().length) {
+        // 최근 3일 안의 이슈가 하나도 없어요 (갱신이 며칠 멈춘 경우). 오래된 이슈를 대신 보여주지 않아요
+        nodes.push(h('div', { class: 'box' }, h('h2', null, `최근 ${FEED_DAYS}일 이슈가 아직 없어요`), h('p', null, '새 이슈가 올라오면 여기에 바로 보여요. 오래된 이슈는 보여드리지 않아요.')));
       } else {
         nodes.push(
           h(
             'div',
             { class: 'box' },
-            h('h2', null, '내 분야의 해설이 아직 없어요'),
-            h('p', null, '새 해설이 올라오면 여기에 보여요. 분야를 바꾸면 다른 해설도 볼 수 있어요.'),
+            h('h2', null, '내 분야의 이슈가 아직 없어요'),
+            h('p', null, '새 이슈가 올라오면 여기에 보여요. 분야를 바꾸면 다른 이슈도 볼 수 있어요.'),
             h('button', { class: 'btn ghost', type: 'button', onclick: () => go('/pick') }, '분야 바꾸기')
           )
         );
@@ -686,7 +701,7 @@
   // ---------- 해설 ----------
   function shareCard(c) {
     const url = (CFG.siteUrl || '') + '#/t/' + encodeURIComponent(c.id);
-    const text = `'${c.keyword}' 왜 뜨지? ${c.line}`;
+    const text = `'${c.keyword}' 왜 화제일까요? ${c.line}`;
     const Share = plugin('Share');
     const run = Share
       ? Share.share({ title: c.keyword, text, url, dialogTitle: '친구에게 공유하기' })
@@ -1069,7 +1084,7 @@
 
   let navigatedInApp = false; // 앱 안에서 화면을 한 번이라도 앞으로 넘겼는지
   function backToList() {
-    // 해설을 연 화면(오늘/사전)으로 돌아가요. 링크로 바로 들어왔다면 오늘 화면으로 가요.
+    // 해설을 연 화면(오늘/검색)으로 돌아가요. 링크로 바로 들어왔다면 오늘 화면으로 가요.
     if (navigatedInApp) history.back();
     else go('/', true);
   }
@@ -1104,9 +1119,11 @@
       catPill(c),
       h('h1', { class: 'dh1' }, h('span', { class: 'hl' }, c.keyword)),
       h('p', { class: 'dline' }, c.line),
+      // 최근 3일이 지난 해설을 링크로 열었을 때: 목록에는 안 나오지만 링크는 열어 주고, 지난 소식이라고 알려줘요
+      daysApart(c.date, todayYmd()) >= FEED_DAYS ? h('p', { class: 'stale', role: 'status' }, `${daysApart(c.date, todayYmd())}일 전 소식이에요. 지금은 내용이 달라졌을 수 있어요.`) : null,
       mediaBlock(c),
-      section('뜻', h('p', null, c.meaning)),
-      section('왜 뜨지?', c.why.map((t, i) => h('div', { class: 'why' }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 't' }, t))))
+      section(c.group === 'meme' ? '뜻' : '무슨 일이에요?', h('p', null, c.meaning)),
+      section('왜 화제일까요?', c.why.map((t, i) => h('div', { class: 'why' }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 't' }, t))))
     ];
     if (c.example) nodes.push(section('이렇게 써요 (예시)', exampleBlock(c)));
     const moreClips = clipsBlock(c);
@@ -1118,25 +1135,22 @@
     view.setAttribute('data-card-id', c.id);
   }
 
-  // ---------- 사전 ----------
+  // ---------- 검색 (최근 3일 이슈) ----------
+  // 오늘 기준 2일 전까지의 이슈를 한곳에 모아 두고, 분야로 걸러 보거나 글자로 찾아요. 그보다 오래된 해설은 여기에도 나오지 않아요.
   function matchTerm(c, needle) {
     if (!needle) return true;
     return [c.keyword, c.line, c.cat, c.meaning].some((t) => String(t).toLowerCase().includes(needle));
   }
 
   function renderDict() {
-    document.title = '사전 – 왜이슈?';
-    if (S.termsState !== 'ok') {
-      if (S.termsState === 'error') S.termsState = 'idle'; // 다시 들어오면 한 번 더 시도해요
-      loadTerms().then(() => view.contains(list) && drawList());
-    }
+    document.title = '검색 – 왜이슈?';
 
     const list = h('div', { class: 'tlist' });
     const empty = h('p', { class: 'note', role: 'status' });
     const input = h('input', {
       id: 'termq',
       type: 'search',
-      placeholder: '모르는 말을 검색해 보세요',
+      placeholder: '궁금한 이슈를 검색해 보세요',
       value: S.q,
       autocomplete: 'off',
       autocapitalize: 'off',
@@ -1151,19 +1165,15 @@
     function drawList() {
       list.textContent = '';
       empty.textContent = '';
-      if (S.termsState === 'loading' || S.termsState === 'idle') {
-        empty.textContent = '사전을 불러오고 있어요…';
-        return;
-      }
-      if (S.termsState === 'error' && !S.terms) {
-        empty.textContent = '사전을 불러오지 못했어요. 인터넷 연결을 확인하고 다시 들어와 주세요.';
+      if (!S.today && !S.recent) {
+        empty.textContent = S.todayState === 'error' ? '이슈를 불러오지 못했어요. 인터넷 연결을 확인하고 다시 들어와 주세요.' : '이슈를 불러오고 있어요…';
         return;
       }
       const needle = S.q.trim().toLowerCase();
       const only = S.groups && S.dictGroup !== 'all' && groupIds().includes(S.dictGroup) ? S.dictGroup : 'all';
-      const hits = S.terms.terms.filter((c) => (only === 'all' || c.group === only) && matchTerm(c, needle));
-      hits.forEach((c) => list.appendChild(termRow(c)));
-      if (!hits.length) empty.textContent = needle ? '검색 결과가 없어요. 다른 말로 찾아보세요.' : only !== 'all' ? '이 분야는 아직 해설한 말이 없어요.' : '아직 해설한 말이 없어요.';
+      const hits = feedCards().filter((c) => (only === 'all' || c.group === only) && matchTerm(c, needle));
+      hits.forEach((c) => list.appendChild(termRow(c, true, true)));
+      if (!hits.length) empty.textContent = needle ? '검색 결과가 없어요. 다른 말로 찾아보세요.' : only !== 'all' ? `이 분야는 최근 ${FEED_DAYS}일 동안 올라온 이슈가 없어요.` : `최근 ${FEED_DAYS}일 동안 올라온 이슈가 아직 없어요.`;
     }
 
     const filterBtns = S.groups
@@ -1187,9 +1197,9 @@
       : [];
 
     setView([
-      h('h1', { class: 'h2big' }, '사전'),
-      h('p', { class: 'sub' }, '지금까지 해설한 말을 모아뒀어요'),
-      h('label', { for: 'termq', style: 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap' }, '모르는 말 검색'),
+      h('h1', { class: 'h2big' }, '검색'),
+      h('p', { class: 'sub' }, `최근 ${FEED_DAYS}일 동안 올라온 이슈를 모아뒀어요`),
+      h('label', { for: 'termq', style: 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap' }, '이슈 검색'),
       h('div', { class: 'field' }, icon('search', 20), input),
       filterBtns.length ? h('div', { class: 'fchips', role: 'group', 'aria-label': '분야로 걸러 보기' }, filterBtns) : null,
       list,
@@ -1367,7 +1377,7 @@
         notifications: [
           {
             id: ID,
-            title: '오늘 뜨는 말',
+            title: '오늘의 화제 이슈',
             body: '오늘의 30초 해설이 도착했어요',
             channelId: 'daily',
             schedule: { on: { hour: S.hour, minute: 0 }, allowWhileIdle: true }
@@ -1406,7 +1416,7 @@
           renderAlerts();
         }
       },
-      h('span', { style: 'display:block' }, h('span', { class: 'l1' }, '아침 알림'), h('span', { class: 'l2' }, push ? '오늘 뜨는 소식을 하루 한 번 알려드려요' : '오늘 뜨는 말이 준비되면 알려드려요')),
+      h('span', { style: 'display:block' }, h('span', { class: 'l1' }, '아침 알림'), h('span', { class: 'l2' }, push ? '오늘의 화제 이슈를 하루 한 번 알려드려요' : '오늘의 화제 이슈가 준비되면 알려드려요')),
       sw
     );
 
@@ -1439,7 +1449,7 @@
     setView(
       [
         h('h1', { class: 'h2big' }, '알림'),
-        h('p', { class: 'sub' }, push ? '오늘 새로 뜬 소식을 아침에 한 번에 알려드려요' : '매일 아침 오늘의 해설이 나왔다고 알려드려요'),
+        h('p', { class: 'sub' }, push ? '오늘 새로 올라온 화제 이슈를 아침에 한 번에 알려드려요' : '매일 아침 오늘의 이슈 해설이 나왔다고 알려드려요'),
         h('div', { class: 'panel' }, toggle, h('div', { class: 'label' }, '받는 시간'), h('div', { class: 'chips' }, hourChips), S.alertBusy > 0 && h('div', { class: 'status', role: 'status', style: 'margin-top:14px' }, '알림을 설정하는 중이에요…'), S.alertBusy === 0 && S.alertMsg && h('div', { class: 'status warn', role: 'status', style: 'margin-top:14px' }, S.alertMsg)),
         h(
           'div',
@@ -1447,7 +1457,7 @@
           h('div', { class: 'ptitle' }, '내 분야'),
           myPills.length ? h('div', { class: 'mypills', style: 'margin-top:12px' }, myPills) : h('p', { class: 'sub', style: 'margin:8px 0 0' }, S.groups ? '아직 고르지 않았어요.' : '분야 목록을 불러오지 못했어요.'),
           S.groups ? h('button', { class: 'btn ghost', type: 'button', style: 'margin-top:14px', onclick: () => go('/pick') }, '분야 바꾸기') : null,
-          h('div', { class: 'info' }, icon('info', 16), h('span', null, push ? '앱 화면에는 고른 분야의 이슈만 보여드려요. 알림은 분야와 상관없이 하루 한 번, 오늘 새로 뜬 소식을 한꺼번에 알려드려요. 정한 시각보다 몇 분 늦게 올 수 있어요. 정치, 사건사고, 실명 의혹은 다루지 않아요.' : '고른 분야의 이슈만 오늘 화면에 보여요. 정치, 사건사고, 실명 의혹은 다루지 않아요.'))
+          h('div', { class: 'info' }, icon('info', 16), h('span', null, push ? '앱 화면에는 고른 분야의 이슈만 보여드려요. 알림은 분야와 상관없이 하루 한 번, 오늘 새로 올라온 이슈를 한꺼번에 알려드려요. 정한 시각보다 몇 분 늦게 올 수 있어요. 확인된 사실만 전하고, 정치 공방과 범죄·사고, 확인되지 않은 의혹은 다루지 않아요.' : '고른 분야의 이슈만 오늘 화면에 보여요. 확인된 사실만 전하고, 정치 공방과 범죄·사고, 확인되지 않은 의혹은 다루지 않아요.'))
         ),
         h('div', { class: 'info' }, icon('info', 16), h('span', null, AI_NOTE)),
         h('p', { class: 'legal' }, h('a', { href: 'privacy.html' }, '개인정보처리방침'))

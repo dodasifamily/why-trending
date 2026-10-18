@@ -3,12 +3,22 @@
   "revision": 2,
   "groups": [
     {
-      "id": "meme",
-      "label": "밈·신조어",
-      "hint": "요즘 유행하는 말과 밈, 화제의 영상",
-      "icon": "meme",
-      "a1": "#3347FF",
-      "a2": "#6F7DFF"
+      "id": "econ",
+      "label": "경제",
+      "hint": "기업·산업·증시·물가 이슈",
+      "icon": "econ",
+      "a1": "#0B7285",
+      "a2": "#15AABF",
+      "since": 2
+    },
+    {
+      "id": "world",
+      "label": "세계",
+      "hint": "해외에서 화제가 된 큰 소식",
+      "icon": "world",
+      "a1": "#D6336C",
+      "a2": "#FF7AA8",
+      "since": 2
     },
     {
       "id": "ent",
@@ -28,29 +38,12 @@
       "a2": "#2FC48D"
     },
     {
-      "id": "game",
-      "label": "게임",
-      "hint": "게임 속 유행과 이슈",
-      "icon": "game",
-      "a1": "#E8590C",
-      "a2": "#FFA94D"
-    },
-    {
       "id": "tech",
       "label": "IT·과학",
       "hint": "앱·기기·AI·우주·과학 소식",
       "icon": "tech",
       "a1": "#243049",
       "a2": "#5A6B91"
-    },
-    {
-      "id": "econ",
-      "label": "경제",
-      "hint": "기업·산업·물가·유통 이야기",
-      "icon": "econ",
-      "a1": "#0B7285",
-      "a2": "#15AABF",
-      "since": 2
     },
     {
       "id": "life",
@@ -63,13 +56,20 @@
       "replaces": ["shop"]
     },
     {
-      "id": "world",
-      "label": "세계",
-      "hint": "해외에서 화제가 된 소식",
-      "icon": "world",
-      "a1": "#D6336C",
-      "a2": "#FF7AA8",
-      "since": 2
+      "id": "game",
+      "label": "게임",
+      "hint": "게임 속 유행과 이슈",
+      "icon": "game",
+      "a1": "#E8590C",
+      "a2": "#FFA94D"
+    },
+    {
+      "id": "meme",
+      "label": "밈·신조어",
+      "hint": "요즘 유행하는 말과 밈",
+      "icon": "meme",
+      "a1": "#3347FF",
+      "a2": "#6F7DFF"
     }
   ]
 }
