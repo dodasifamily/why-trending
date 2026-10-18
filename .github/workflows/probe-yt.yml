@@ -1,0 +1,20 @@
+name: 영상 후보 확인 (임시, 확인 뒤 지워요)
+
+# 유튜브 영상 후보의 채널·제목을 oEmbed 로 물어 로그에 남겨요. 사이트·저장소 데이터는 건드리지 않아요.
+on:
+  push:
+    branches: [probe-yt]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 후보 영상 확인
+        run: node scripts/content.mjs verify-media --site probe-site
