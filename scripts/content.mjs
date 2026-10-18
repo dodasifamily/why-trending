@@ -75,6 +75,8 @@ const NEWS_CHANNELS = [
   '연합뉴스TV', '연합뉴스TV Yonhap News TV', '연합뉴스 Yonhapnews', '연합뉴스',
   // 신문사·방송사가 직접 운영하는 영상 채널: 서울경제TV(서울경제), 14F 일사에프(한국일보), 전자신문 etnews(전자신문), 엠빅뉴스(MBC), Arirang News(아리랑TV)
   '서울경제TV', '14F 일사에프', '전자신문 etnews', '엠빅뉴스', 'Arirang News',
+  // 지역 방송사 뉴스 채널(지역 행사·소식은 전국 방송보다 지역 방송사에 영상이 있는 경우가 많아요): 대전MBC 뉴스(대전MBC, 2026-10-18 추가)
+  '대전MBC 뉴스',
   'ABC News', 'Bloomberg Television', 'CNBC Television', 'Reuters', 'BBC News', 'CNN', 'Associated Press', 'NBC News', 'CBS News', 'Sky News'
 ];
 // 제목에 이런 말이 있으면 반응 영상·모음·자극적인 영상일 가능성이 커서 쓰지 않아요.
