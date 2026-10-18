@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "revision": 2,
+  "revision": 4,
   "groups": [
     {
       "id": "econ",
@@ -61,7 +61,8 @@
       "hint": "게임 속 유행과 이슈",
       "icon": "game",
       "a1": "#E8590C",
-      "a2": "#FFA94D"
+      "a2": "#FFA94D",
+      "since": 4
     },
     {
       "id": "meme",
