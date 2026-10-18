@@ -949,6 +949,24 @@
         "L",
         "🏳️"
       ],
+      "clips": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "B9bJ0IiI6Co",
+          "channel": "밈달팽이",
+          "title": "L을 가져가 밈에 대해 알아보자.",
+          "views": 300263
+        },
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "hoVJeMcSeto",
+          "channel": "권루트 로블록스",
+          "title": "권루트 챌린지 #L을가져가",
+          "views": 7340000
+        }
+      ],
       "sources": [
         {
           "name": "캐릿",

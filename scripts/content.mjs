@@ -79,6 +79,15 @@ const NEWS_CHANNELS = [
 ];
 // 제목에 이런 말이 있으면 반응 영상·모음·자극적인 영상일 가능성이 커서 쓰지 않아요.
 const VIDEO_TITLE_BLOCKED = /리액션|reaction|해외\s*반응|반응\s*영상|모음|compilation|충격|경악|폭로|논란|의혹|ㄷㄷ/i;
+// 많이 본 관련 영상(clips) 규칙 (2026-10-18 사용자 요청: 'L을 가져가' 처럼 유튜브에 연관 영상이 많은 말).
+// 뉴스·공식 채널 영상(media)이 없는 밈·신조어 카드에, 그 말로 유튜브를 검색해 찾은 '많이 본 영상'을 카드당 CLIP_MAX 개까지 붙여요.
+// 올린 곳이 일반 채널이어도 받는 대신 이렇게 걸러요: (1) 조회수 CLIP_MIN_VIEWS 이상 (갱신 담당이 영상 페이지에서 읽은 숫자, 그 뒤로는 늘기만 하니 '이상'으로 보여줘요),
+// (2) 영상 제목에 카드 키워드가 그대로 들어 있어야 해요(연관성), (3) 제목에 반응·모음·자극적인 말이나 아이(미성년자)가 주인공이라는 단서가 없어야 해요.
+// 영상 안의 내용은 우리가 확인할 수 없으니 앱이 '유튜브에 올라온 영상이에요. 내용은 왜이슈?와 관계없어요'라고 알려줘요. clips 는 출처(sources)가 아니에요.
+const CLIP_GROUPS = ['meme'];
+const CLIP_MAX = 2;
+const CLIP_MIN_VIEWS = 100000;
+const CLIP_TITLE_BLOCKED = /초등|초딩|중딩|고딩|어린이|유치원|키즈|\bkids?\b|아기|애기|베이비|꼬마|청소년|미성년/i;
 // 예전 형식(from) 영상을 가져오는 기사 매체
 const VIDEO_FROM_HOSTS = [
   'www.ytn.co.kr', // 확인됨: 기사 페이지에 자사 유튜브 영상을 싣는 매체
@@ -248,6 +257,7 @@ function validateCard(card, where) {
   if (Array.isArray(card.why)) card.why.forEach((w, i) => typeof w === 'string' && scanBlocked(where, `why[${i}]`, w));
 
   validateMedia(card, where);
+  validateClips(card, where);
   validateScene(card, where);
 }
 
@@ -317,6 +327,42 @@ function validateMedia(card, where) {
       err(w, `'${m.channel}' 은(는) 뉴스 채널 허용 목록에 없어요. 방송·언론사 채널이 맞다면 content.mjs 의 NEWS_CHANNELS 에 먼저 추가하고, 아니면 official(당사자 공식 채널)인 경우에만 쓰세요`);
     }
     if (m.from !== undefined && !from) err(w, 'from 을 쓴다면 이 카드의 출처(sources)에 들어 있는 기사 주소여야 해요');
+  });
+}
+
+// clips 는 선택 항목이에요(밈·신조어 카드만). 뉴스·공식 영상이 없는 말에, 유튜브에서 그 말로 검색해 찾은 '많이 본 영상'을 보여줘요.
+// 형식: "clips": [{ "type": "video", "provider": "youtube", "id": "11글자", "channel": "유튜브에 보이는 채널 이름", "title": "유튜브에 적힌 영상 제목", "views": 300263 }]
+//   views: 갱신 담당이 영상 페이지에서 읽은 조회수예요(CLIP_MIN_VIEWS 이상). 페이지에서 읽을 수 없는 영상은 쓰지 않아요.
+function validateClips(card, where) {
+  if (card.clips === undefined) return;
+  if (!CLIP_GROUPS.includes(card.group)) return err(where, `clips 는 ${CLIP_GROUPS.join('·')} 분야 카드에만 붙일 수 있어요`);
+  if (!Array.isArray(card.clips) || card.clips.length < 1 || card.clips.length > CLIP_MAX) {
+    return err(where, `clips 는 영상 1~${CLIP_MAX}개짜리 목록이어야 해요 (영상이 없으면 clips 항목 자체를 빼세요)`);
+  }
+  const seen = new Set(Array.isArray(card.media) && card.media[0] && typeof card.media[0].id === 'string' ? [card.media[0].id] : []);
+  const key = textKey(card.keyword);
+  card.clips.forEach((m, i) => {
+    const w = `${where}.clips[${i}]`;
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return err(w, '객체가 아니에요');
+    if (m.type !== 'video') err(w, "type 은 'video' 만 쓸 수 있어요");
+    const extra = Object.keys(m).filter((k) => !['type', 'provider', 'id', 'channel', 'title', 'views'].includes(k));
+    if (extra.length) err(w, `쓸 수 없는 항목이 있어요: ${extra.join(', ')}`);
+    if (m.provider !== 'youtube') err(w, "provider 는 'youtube' 여야 해요");
+    if (typeof m.id !== 'string' || !YOUTUBE_ID.test(m.id)) err(w, 'id 는 유튜브 영상 주소의 11글자 번호여야 해요 (영문·숫자·-·_)');
+    else if (seen.has(m.id)) err(w, `같은 영상이 한 카드에 두 번 들어 있어요: ${m.id}`);
+    else seen.add(m.id);
+    checkString(w, 'channel', m.channel, 1, VIDEO_CHANNEL_MAX);
+    checkString(w, 'title', m.title, 1, VIDEO_TITLE_MAX);
+    if (typeof m.channel === 'string') scanBlocked(w, 'channel', m.channel);
+    if (typeof m.title === 'string') {
+      scanBlocked(w, 'title', m.title);
+      if (VIDEO_TITLE_BLOCKED.test(m.title)) err(w, `영상 제목에 반응 영상·모음·자극적인 영상의 단서가 있어요: ${m.title}`);
+      if (CLIP_TITLE_BLOCKED.test(m.title)) err(w, `영상 제목에 아이(미성년자)가 주인공일 수 있는 단서가 있어서 쓰지 않아요: ${m.title}`);
+      if (key && !textKey(m.title).includes(key)) err(w, `영상 제목에 카드 키워드 '${card.keyword}' 가 그대로 들어 있어야 해요(연관성): ${m.title}`);
+    }
+    if (!Number.isInteger(m.views) || m.views < CLIP_MIN_VIEWS || m.views > 100000000000) {
+      err(w, `views 는 영상 페이지에서 읽은 조회수(${CLIP_MIN_VIEWS} 이상의 정수)여야 해요`);
+    }
   });
 }
 
@@ -626,14 +672,17 @@ async function verifyMedia() {
     .filter((f) => existsSync(f.path))
     .map((f) => ({ ...f, json: readJson(f.path) }));
 
+  // 카드의 영상은 두 곳이에요: media(뉴스·공식 채널 영상 1개), clips(밈 카드의 많이 본 관련 영상)
+  const videosOf = (c) => [...(c && Array.isArray(c.media) ? c.media.slice(0, 1) : []), ...(c && Array.isArray(c.clips) ? c.clips : [])];
   const videos = new Map(); // id -> { id, channel, title, cards }
   for (const f of files) {
     for (const c of f.list(f.json) || []) {
-      const m = c && Array.isArray(c.media) ? c.media[0] : null;
-      if (!m || typeof m.id !== 'string' || !YOUTUBE_ID.test(m.id)) continue;
-      const v = videos.get(m.id) || { id: m.id, channel: m.channel, title: m.title, cards: new Set() };
-      v.cards.add(c.id);
-      videos.set(m.id, v);
+      for (const m of videosOf(c)) {
+        if (!m || typeof m.id !== 'string' || !YOUTUBE_ID.test(m.id)) continue;
+        const v = videos.get(m.id) || { id: m.id, channel: m.channel, title: m.title, cards: new Set() };
+        v.cards.add(c.id);
+        videos.set(m.id, v);
+      }
     }
   }
   if (!videos.size) return console.log('ℹ️ 확인할 영상이 없어요');
@@ -700,6 +749,15 @@ async function verifyMedia() {
           delete c.media;
           changed = true;
           cut++;
+        }
+        if (c && Array.isArray(c.clips)) {
+          const keep = c.clips.filter((x) => !(x && bad.has(x.id)));
+          if (keep.length !== c.clips.length) {
+            cut += c.clips.length - keep.length;
+            if (keep.length) c.clips = keep;
+            else delete c.clips;
+            changed = true;
+          }
         }
       }
       if (changed) writeJson(f.path, f.json);

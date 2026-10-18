@@ -775,6 +775,41 @@
     return { id, title: src ? String(src.title || '') : c.keyword, credit: src && src.name ? `${src.name} 기사에 실린 영상` : '관련 영상' };
   }
 
+  /** 조회수를 '○○만 회'로 바꿔요. 앞 두 자리만 남기고 내려서(734만 → 730만) 실제보다 크게 보이지 않아요 */
+  function viewsText(n) {
+    if (typeof n !== 'number' || !Number.isFinite(n) || n < 10000) return '';
+    if (n >= 100000000) return `${Math.floor(n / 10000000) / 10}억 회`;
+    const man = n / 10000;
+    const p = Math.pow(10, Math.max(0, Math.floor(Math.log10(man)) - 1));
+    return `${(Math.floor(man / p) * p).toLocaleString('en-US')}만 회`;
+  }
+
+  /**
+   * 유튜브에서 많이 본 관련 영상(밈·신조어 카드의 clips). 뉴스·공식 채널 영상이 없는 말에 그 말로 검색해 고른 영상이에요.
+   * 데이터가 어긋난 항목은 건너뛰고, 최대 3개까지만 보여줘요. 올린 곳이 일반 채널일 수 있어서 '왜이슈?와 관계없어요'라고 알려줘요.
+   */
+  function clipsOf(c) {
+    const list = Array.isArray(c.clips) ? c.clips : [];
+    const out = [];
+    const seen = new Set();
+    for (const m of list) {
+      if (out.length >= 3) break;
+      if (!m || m.type !== 'video' || m.provider !== 'youtube' || !YOUTUBE_ID.test(String(m.id)) || seen.has(String(m.id))) continue;
+      const channel = typeof m.channel === 'string' ? m.channel.trim().slice(0, 40) : '';
+      if (!channel) continue;
+      seen.add(String(m.id));
+      const title = typeof m.title === 'string' && m.title.trim() ? m.title.trim().slice(0, 120) : c.keyword;
+      const views = viewsText(m.views);
+      out.push({
+        id: String(m.id),
+        title,
+        credit: `유튜브 영상 · ${channel}${views ? ` · 조회수 ${views} 이상` : ''}`,
+        note: '유튜브에 올라온 영상이에요. 내용은 왜이슈?와 관계없어요.'
+      });
+    }
+    return out;
+  }
+
   /** 큰 미리보기 → 보통 미리보기 순서로 시도해요. 둘 다 안 되면 onFail */
   function loadThumb(img, id, onFail) {
     const urls = [`https://i.ytimg.com/vi/${id}/maxresdefault.jpg`, `https://i.ytimg.com/vi/${id}/hqdefault.jpg`];
@@ -927,9 +962,8 @@
     return stop;
   }
 
-  function mediaBlock(c) {
-    const v = videoOf(c);
-    if (!v) return artBlock(c);
+  /** 영상 한 칸: 미리보기를 누르면 그 자리에서 재생해요. v 는 videoOf·clipsOf 가 돌려준 값이에요 */
+  function videoFigure(v) {
     const watch = `https://www.youtube.com/watch?v=${v.id}`;
     const img = h('img', { alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
     const play = h(
@@ -947,6 +981,14 @@
       play.addEventListener('click', (e) => {
         if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
+        // 한 화면에 영상이 여러 개일 때, 다른 영상이 재생 중이면 멈춰요
+        view.querySelectorAll('.vframe iframe').forEach((f) => {
+          try {
+            f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: '' }), '*');
+          } catch (err) {
+            /* 보낼 수 없으면 그냥 넘어가요 */
+          }
+        });
         const iframe = h('iframe', {
           src: embedUrl(v.id),
           title: v.title,
@@ -980,8 +1022,26 @@
         { class: 'vcap' },
         h('span', null, v.credit),
         h('a', { href: watch, target: '_blank', rel: 'noopener noreferrer' }, 'YouTube에서 보기', icon('out', 14))
-      )
+      ),
+      v.note ? h('p', { class: 'vnote' }, v.note) : null
     );
+  }
+
+  /** 해설 위쪽 큰 칸: 뉴스·공식 영상 → (없으면) 많이 본 관련 영상 → (없으면) 장면·분야 그림 카드 순서로 보여줘요 */
+  function heroVideo(c) {
+    return videoOf(c) || clipsOf(c)[0] || null;
+  }
+
+  function mediaBlock(c) {
+    const v = heroVideo(c);
+    return v ? videoFigure(v) : artBlock(c);
+  }
+
+  /** 위쪽 큰 칸에 쓰고 남은 '많이 본 관련 영상'. 없으면 null */
+  function clipsBlock(c) {
+    const hero = heroVideo(c);
+    const rest = clipsOf(c).filter((v) => !hero || v.id !== hero.id);
+    return rest.length ? section('많이 본 관련 영상', rest.map(videoFigure)) : null;
   }
 
   function sourceList(c) {
@@ -1049,6 +1109,8 @@
       section('왜 뜨지?', c.why.map((t, i) => h('div', { class: 'why' }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 't' }, t))))
     ];
     if (c.example) nodes.push(section('이렇게 써요 (예시)', exampleBlock(c)));
+    const moreClips = clipsBlock(c);
+    if (moreClips) nodes.push(moreClips);
     nodes.push(findBlock(c));
     nodes.push(section('출처', sourceList(c), h('p', { class: 'note', style: 'margin:10px 4px 0' }, AI_NOTE)));
     nodes.push(h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', onclick: () => shareCard(c) }, '친구에게 공유하기'), reportArea(c)));

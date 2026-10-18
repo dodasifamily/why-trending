@@ -325,6 +325,10 @@ a { color: inherit; }
   color: var(--muted);
 }
 .vcap span { min-width: 0; overflow-wrap: anywhere; }
+/* 일반 채널이 올린 '많이 본 관련 영상': 안내 글, 해설 아래 목록에서의 간격 */
+.media .vnote { margin: 0 2px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.sec .media { margin-top: 12px; }
+.sec .media + .media { margin-top: 24px; }
 .vcap a {
   display: inline-flex;
   align-items: center;
