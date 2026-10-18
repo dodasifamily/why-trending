@@ -20,7 +20,7 @@
 // 하는 일
 //   1) 오늘(한국 시간) 해설이 main 에 올라올 때까지 기다려요 (git fetch 로 origin/main 의 today.json 을 봐요)
 //   2) 오늘 해설이 있으면 알림을 1개 만들어, '이 시각을 고른 기기'(주제 'h<시각>')에 보내요.
-//      제목은 '오늘 뜨는 소식 N개', 내용은 서로 다른 분야의 대표 소식 2개 + 나머지 개수예요. 누르면 앱 첫 화면이 열려요.
+//      제목은 '오늘 화제 이슈 N개', 내용은 서로 다른 분야의 대표 이슈 2개 + 나머지 개수예요. 누르면 앱 첫 화면이 열려요.
 //      (앱은 알림을 켤 때 'cat_<분야>' 와 'h<시각>' 주제를 함께 구독하지만, 알림은 분야와 상관없이 시각 주제로만 보내요)
 //   3) 오늘 해설이 없거나 아직 안 올라왔으면 아무것도 보내지 않아요. 지난 해설로 '새 해설' 알림을 보내지 않아요.
 //
@@ -89,8 +89,8 @@ export function buildMessages({ today, hour, date }) {
     {
       group: 'all',
       topic: `h${hour}`,
-      title: `오늘 뜨는 소식 ${cards.length}개`,
-      body: `${leads.map((c) => c.keyword.trim()).join(', ')}${rest > 0 ? ` 외 ${rest}개` : ''} · 왜 뜨는지 30초로 알아봐요`,
+      title: `오늘 화제 이슈 ${cards.length}개`,
+      body: `${leads.map((c) => c.keyword.trim()).join(', ')}${rest > 0 ? ` 외 ${rest}개` : ''} · 왜 화제인지 30초로 알아봐요`,
       route: '/',
       count: cards.length
     }
