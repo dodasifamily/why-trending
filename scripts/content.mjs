@@ -3,7 +3,8 @@
 //
 //   node scripts/content.mjs validate   categories.json / today.json / terms.json 규칙 검사 (어기면 종료 코드 1)
 //   node scripts/content.mjs merge      today.json 의 카드를 terms.json(사전)에 합치기
-//   node scripts/content.mjs recent     최근 3일(오늘 기준 2일 전까지) 이슈 해설을 모은 recent.json 만들기 (사이트·앱을 올릴 때 자동으로 만들어져요. 저장소에는 올리지 않아요)
+//   node scripts/content.mjs recent     최근 3일(오늘 기준 2일 전까지) 이슈 해설을 모은 recent.json 과, 분야를 적게 고른 사람에게 더 오래된 이슈까지 보여주려고 모아 두는 지난 이슈 보관함 archive.json 만들기
+//                                                     (사이트·앱을 올릴 때 자동으로 만들어져요. 저장소에는 올리지 않아요)
 //   node scripts/content.mjs check <카드목록.json>   새 카드 후보 파일이 규칙에 맞는지만 검사 (사전·today 는 건드리지 않아요)
 //   node scripts/content.mjs add <카드목록.json>     검사를 통과한 지난 카드를 사전(terms.json)에만 추가 (오늘 카드는 today.json + merge 로 올려요)
 //   node scripts/content.mjs verify-media [--prune]  카드에 붙인 유튜브 영상이 실제로 있고 다른 곳에서 재생이 허용되는지 유튜브에 물어봐요
@@ -29,20 +30,22 @@ const TODAY_PATH = join(siteDir, 'data', 'today.json');
 const TERMS_PATH = join(siteDir, 'data', 'terms.json');
 const CATEGORIES_PATH = join(siteDir, 'data', 'categories.json');
 const RECENT_PATH = join(siteDir, 'data', 'recent.json');
+const ARCHIVE_PATH = join(siteDir, 'data', 'archive.json');
 
 // 분야 목록은 site/data/categories.json 하나만 기준이에요. (앱 화면과 이 검사가 같은 파일을 읽어요)
 // loadCategories() 가 그 파일의 id 로 채워요.
 let GROUPS = [];
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 // 하루 카드는 여러 분야에 골고루 있어야 '내 분야' 만 골라 본 사람도 매일 볼 거리가 있어요.
-// 2026-10-19 사용자 요청: 앱은 '오늘 기준 2일 전'까지의 이슈만 보여줘요 (오늘·어제·그저께 = 3일). 그보다 오래된 이슈는 어디서도 보여주지 않아요.
-// 앱은 고른 분야마다 그 3일 안의 해설을 최신 순으로 최대 FEED_MAX_PER_GROUP 개 보여줘요. 그래서 분야마다 하루 1~2개씩 꾸준히 쌓여야 해요.
+// 2026-10-19 사용자 요청: 앱은 모든 분야를 고르면 '오늘 기준 2일 전'까지(오늘·어제·그저께 = 3일)만 보여줘요.
+// 분야를 적게 고를수록 화면에 보이는 양이 비슷하도록 더 오래된 이슈까지 보여주고, 분야를 딱 1개만 고르면 그 분야의 이슈를 모두 보여줘요 (site/js/app.js 의 windowDays).
+// 그래서 분야마다 하루 1~2개씩 꾸준히 쌓여야 해요.
 const MIN_CARDS_PER_DAY = 7;
 const MAX_CARDS_PER_DAY = 14;
 const MIN_GROUPS_PER_DAY = 5; // 하루 카드가 걸쳐야 하는 서로 다른 분야 수
 const MAX_PER_GROUP_PER_DAY = 4; // 한 분야가 하루 카드를 독차지하지 않게
-const RECENT_DAYS = 3; // 앱이 보여주는 기간 (오늘 포함 3일 = 오늘 기준 2일 전까지). 앱 화면(site/js/app.js 의 FEED_DAYS)과 같은 값이에요
-const FEED_MAX_PER_GROUP = 7; // 앱 첫 화면이 분야마다 보여주는 최대 개수 (app.js 의 FEED_MAX 와 같은 값. recent.json 은 기간 안의 해설을 모두 담아요)
+const RECENT_DAYS = 3; // 모든 분야를 골랐을 때 앱이 보여주는 기간 (오늘 포함 3일 = 오늘 기준 2일 전까지). 앱 화면(site/js/app.js 의 FEED_DAYS)과 같은 값이에요
+const ARCHIVE_MAX_PER_GROUP = 300; // 지난 이슈 보관함(archive.json)에 분야마다 담는 최대 개수(가장 최근 것부터). 하루 1개쯤 쌓이니 약 1년치예요. 넘치면 오래된 것부터 빠져요(사전 terms.json 에는 남아요)
 const FEED_MIN_PER_GROUP = 2; // 분야마다 최근 RECENT_DAYS 일 안에 이만큼은 있어야 해요 (모자라면 validate 가 알려줘요)
 // '오늘 뜨는' 소식이 며칠 전·지난달 기사에 기대지 않게 해요. 아래 일수는 모두 카드 날짜(date) 기준이에요.
 //  - 모든 출처가 MAX_SOURCE_AGE_DAYS 일 안에 나온 기사여야 해요.
@@ -50,7 +53,7 @@ const FEED_MIN_PER_GROUP = 2; // 분야마다 최근 RECENT_DAYS 일 안에 이�
 //  - FRESH_SOURCE_DAYS 일 안에 나온 기사가 서로 다른 매체 MIN_FRESH_OUTLETS 곳 이상이어야 해요.
 // 유행어·밈(meme 분야)은 기사가 드문드문 올라와서 기준을 조금 넓혀요 (MEME_*).
 // 오늘 카드와 `check`/`add` 후보에는 이 기준이 에러로 적용돼요. 사전(terms.json)에 이미 있는 카드는 지우지 않지만,
-// 이 기준을 못 넘으면 앱의 '최근 3일' 목록(recent.json)에서는 빠져요 (사전 terms.json 에는 그대로 남아요).
+// 이 기준을 못 넘으면 앱의 목록(recent.json·archive.json)에서는 빠져요 (사전 terms.json 에는 그대로 남아요).
 const MAX_SOURCE_AGE_DAYS = 14;
 const NEWEST_SOURCE_MAX_DAYS = 1;
 const FRESH_SOURCE_DAYS = 3;
@@ -568,8 +571,10 @@ function merge() {
   console.log(`✅ 사전에 합쳤어요: 총 ${terms.terms.length}개`);
 }
 
-// 앱이 보여주는 이슈 목록 파일을 만들어요. 사전(terms.json)은 계속 커지니까, '오늘 기준 2일 전'까지(RECENT_DAYS 일) 해설만 최신순으로 모두 담아요.
-// 앱 첫 화면의 분야별 목록과 '검색' 화면이 모두 이 파일을 써요. 앱 화면도 같은 기간만 보여줘서(app.js 의 FEED_DAYS), 기간이 지난 해설은 어디서도 안 보여요.
+// 앱이 보여주는 이슈 목록 파일 두 개를 만들어요. 사전(terms.json)은 계속 커지니까 앱이 쓰기 좋게 나눠 담아요.
+//  - recent.json: '오늘 기준 2일 전'까지(RECENT_DAYS 일) 해설을 최신순으로 모두 담아요. 앱을 켤 때마다 받는 작은 파일이고, 모든 분야를 골랐을 때의 첫 화면과 검색 화면이 써요.
+//  - archive.json: 분야를 적게 고른 사람에게 더 오래된 이슈까지 보여주려는 지난 이슈 보관함이에요. 같은 신선도 기준을 통과한 해설을 오늘까지 분야마다 최근
+//    ARCHIVE_MAX_PER_GROUP 개씩 담아요. 앱은 3일보다 긴 기간을 보여줘야 할 때만(분야를 6개 이하로 골랐거나, 글자로 검색할 때) 받아 가요.
 // today.json 의 날짜를 기준으로 하고, 사전에서 파생되는 파일이라 저장소에는 올리지 않고 올릴 때마다 새로 만들어요.
 function recent() {
   const today = readJson(TODAY_PATH);
@@ -578,18 +583,30 @@ function recent() {
   const byId = new Map();
   for (const c of [...(Array.isArray(terms.terms) ? terms.terms : []), ...today.cards]) byId.set(c.id, c);
   const from = shiftDate(today.date, -(RECENT_DAYS - 1));
-  const inRange = [...byId.values()]
+  const newestFirst = [...byId.values()]
     .map((c, idx) => ({ c, idx }))
-    .filter((x) => x.c.date >= from && x.c.date <= today.date)
+    .filter((x) => isRealDate(x.c.date) && x.c.date <= today.date)
     .sort((a, b) => (a.c.date < b.c.date ? 1 : a.c.date > b.c.date ? -1 : a.idx - b.idx));
-  // 며칠 전·지난달 기사에 기댄 해설은 '최근 3일' 목록에 올리지 않아요 (사전에는 그대로 있어요)
-  const inWindow = inRange.filter((x) => freshnessProblems(x.c).length === 0);
-  if (inWindow.length < inRange.length) {
-    console.log(`ℹ️ 출처가 오래돼 최근 목록에서 뺀 해설 ${inRange.length - inWindow.length}개: ${inRange.filter((x) => !inWindow.includes(x)).map((x) => x.c.id).join(', ')}`);
+  // 며칠 전·지난달 기사에 기댄 해설은 앱 목록에 올리지 않아요 (사전에는 그대로 있어요)
+  const eligible = newestFirst.filter((x) => freshnessProblems(x.c).length === 0);
+  if (eligible.length < newestFirst.length) {
+    const out = newestFirst.filter((x) => !eligible.includes(x));
+    console.log(`ℹ️ 출처가 오래돼 앱 목록에서 뺀 해설 ${out.length}개 (사전에는 남아요): ${out.slice(0, 8).map((x) => x.c.id).join(', ')}${out.length > 8 ? ' 외' : ''}`);
   }
-  const cards = inWindow.map((x) => x.c);
+  const cards = eligible.filter((x) => x.c.date >= from).map((x) => x.c);
   writeJson(RECENT_PATH, { schema: 1, updatedAt: today.updatedAt, days: RECENT_DAYS, cards });
   console.log(`✅ 최근 ${RECENT_DAYS}일 해설 ${cards.length}개를 recent.json 에 담았어요 (${from} ~ ${today.date})`);
+
+  const perGroup = {};
+  const kept = eligible
+    .filter((x) => {
+      const n = (perGroup[x.c.group] = (perGroup[x.c.group] || 0) + 1);
+      return n <= ARCHIVE_MAX_PER_GROUP;
+    })
+    .map((x) => x.c);
+  writeJson(ARCHIVE_PATH, { schema: 1, updatedAt: today.updatedAt, maxPerGroup: ARCHIVE_MAX_PER_GROUP, cards: kept });
+  const cut = eligible.length - kept.length;
+  console.log(`✅ 지난 이슈 보관함 ${kept.length}개를 archive.json 에 담았어요${kept.length ? ` (${kept[kept.length - 1].date} ~ ${today.date})` : ''}${cut ? ` · 분야마다 ${ARCHIVE_MAX_PER_GROUP}개를 넘어 오래된 ${cut}개는 뺐어요` : ''}`);
 }
 
 // 새 카드 후보 파일(JSON 배열)을 규칙에 맞춰 검사해요. 사전·today 는 읽기만 하고, 통과한 카드 목록을 돌려줘요.
@@ -614,7 +631,7 @@ function checkFile(file) {
     checkFreshness(c, w);
     if (isRealDate(c.date) && from) {
       if (c.date > today.date) err(w, `date(${c.date}) 가 오늘(${today.date}) 보다 미래예요`);
-      else if (c.date < from) err(w, `date(${c.date}) 가 최근 ${RECENT_DAYS}일(${from} ~ ${today.date}) 밖이에요. 앱 목록에 나오지 않아요`);
+      else if (c.date < from) err(w, `date(${c.date}) 가 최근 ${RECENT_DAYS}일(${from} ~ ${today.date}) 밖이에요. 오래된 소재로 오늘 분량을 채우지 않아요`);
     }
     if (ids.has(c.id) || seenIds.has(c.id)) err(w, `id 가 사전이나 이 파일 안에서 겹쳐요: ${c.id}`);
     seenIds.add(c.id);
@@ -633,7 +650,7 @@ function checkFile(file) {
   return { cards, terms };
 }
 
-// 지난 날짜의 카드를 사전에만 더해요 (앱의 분야별 목록은 사전에서 recent.json 을 만들어 써요).
+// 지난 날짜의 카드를 사전에만 더해요 (앱의 분야별 목록은 사전에서 recent.json·archive.json 을 만들어 써요).
 function add(file) {
   const { cards, terms } = checkFile(file);
   const list = Array.isArray(terms.terms) ? terms.terms : [];
@@ -652,7 +669,7 @@ function add(file) {
 //  - 유튜브가 확실히 '없다 / 재생이 막혔다 / 채널이 다르다'고 알려준 영상만 문제로 봐요.
 //    인터넷 문제 등으로 확인하지 못한 영상은 그대로 두어요.
 //  - 확인용 영상(CANARY)조차 열리지 않으면 이 컴퓨터에서는 확인이 안 되는 상태라서, 아무것도 빼지 않고 건너뛰어요.
-//  - --prune 이면 문제 영상을 '올릴 파일'(today·terms·recent)에서만 빼요. 저장소에 저장된 원본은 건드리지 않아요.
+//  - --prune 이면 문제 영상을 '올릴 파일'(today·terms·recent·archive)에서만 빼요. 저장소에 저장된 원본은 건드리지 않아요.
 const OEMBED_URL = process.env.YT_OEMBED_URL || 'https://www.youtube.com/oembed';
 const CANARY_ID = 'jNQXAC9IVRw'; // 유튜브의 첫 영상. 오래 남아 있는 확인용 영상이에요.
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -701,12 +718,13 @@ function dice(a, b) {
 // GitHub Actions 의 줄 메모(annotation)에 넣을 글자 처리
 const ghEsc = (s) => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
 
-// 올릴 카드 파일 세 개(오늘·사전·최근 목록)를 읽어요. 있는 것만요.
+// 올릴 카드 파일 네 개(오늘·사전·최근 목록·지난 이슈 보관함)를 읽어요. 있는 것만요.
 function siteFiles() {
   return [
     { path: TODAY_PATH, list: (j) => j.cards },
     { path: TERMS_PATH, list: (j) => j.terms },
-    { path: RECENT_PATH, list: (j) => j.cards }
+    { path: RECENT_PATH, list: (j) => j.cards },
+    { path: ARCHIVE_PATH, list: (j) => j.cards }
   ]
     .filter((f) => existsSync(f.path))
     .map((f) => ({ ...f, json: readJson(f.path) }));
@@ -819,7 +837,7 @@ async function verifyMedia() {
 //    붙이기 전에 validateMedia·validateClips 로 한 번 더 검사해요.
 //  - 구글이 2026년 6월부터 검색(search.list)을 하루 100번까지만 무료로 줘서, 영상이 없는 카드만 찾고 한 번에 FIND_MAX_SEARCHES 번까지만 써요.
 //    결과(못 찾은 것도)는 --cache 파일에 적어 두고 GitHub Actions 캐시로 이어 써서, 같은 카드를 FIND_RETRY_HOURS 시간 안에는 다시 검색하지 않아요.
-//  - --write 가 있을 때만 올릴 파일(today·terms·recent)에 붙여요. 저장소 원본에는 커밋하지 않아요.
+//  - --write 가 있을 때만 올릴 파일(today·terms·recent·archive)에 붙여요. 저장소 원본에는 커밋하지 않아요.
 //    유튜브 API 이용약관(받아 둔 정보는 30일 안에 새로 받거나 지우기)에 맞게 기록은 FIND_KEEP_DAYS 일만 써요.
 //  - 키(YOUTUBE_API_KEY)가 없거나 오류가 나면 건너뛰어요(사이트는 그대로 올라가요). 키는 로그에 찍지 않아요.
 const YT_API_URL = (process.env.YT_API_URL || 'https://www.googleapis.com/youtube/v3').replace(/\/+$/, '');
@@ -1085,7 +1103,7 @@ async function findVideos() {
   const nowIso = new Date(now).toISOString();
 
   const picks = new Map(); // 카드 id -> { media | clips, info, cached }
-  const stat = { cached: 0, searched: 0, found: 0, none: 0, waiting: 0, postponed: 0 };
+  const stat = { cached: 0, searched: 0, found: 0, none: 0, waiting: 0, postponed: 0, older: 0 };
   const misses = []; // 못 찾은 카드와 이유 (실행 화면 메모용)
   let stopped = '';
   const deadline = Date.now() + 4 * 60 * 1000; // 인터넷이 느려도 이 단계가 오래 붙잡지 않게
@@ -1139,8 +1157,23 @@ async function findVideos() {
     await sleep(200);
   }
 
+  // 3일이 지나 최근 목록에서 빠졌지만 지난 이슈 보관함(archive.json)에는 있는 카드도, 기록에 영상이 남아 있는 동안은 계속 붙여요
+  // (분야를 적게 고른 사람은 더 오래된 이슈까지 보니까, 어제까지 있던 영상이 갑자기 사라지지 않게 해요). 이런 카드는 새로 검색하지 않아요.
+  const inRecent = new Set(cards.map((c) => c.id));
+  const archiveFile = files.find((f) => f.path === ARCHIVE_PATH);
+  const olderIds = new Set();
+  for (const c of archiveFile ? archiveFile.list(archiveFile.json) || [] : []) {
+    if (!c || typeof c.id !== 'string' || typeof c.keyword !== 'string' || !isRealDate(c.date) || inRecent.has(c.id) || picks.has(c.id) || !needsVideo(c)) continue;
+    const hit = cache.cards[c.id];
+    const stamp = hit ? Date.parse(hit.fetchedAt || hit.searchedAt) : NaN;
+    if (!hit || hit.sig !== `${c.keyword}|${c.date}` || !hit.pick || !Number.isFinite(stamp) || (now - stamp) / DAY_MS > FIND_KEEP_DAYS || pickProblems(c, hit.pick).length) continue;
+    picks.set(c.id, { ...hit.pick, info: Array.isArray(hit.info) ? hit.info : [], cached: true });
+    olderIds.add(c.id);
+    stat.older++;
+  }
+
   // 지금 영상이 필요 없는 카드·오래된 기록은 정리해요
-  const want = new Set(cards.map((c) => c.id));
+  const want = new Set([...cards.map((c) => c.id), ...olderIds]);
   for (const id of Object.keys(cache.cards)) {
     const e = cache.cards[id];
     if (!want.has(id) || !e || (now - Date.parse(e.searchedAt)) / DAY_MS > FIND_KEEP_DAYS + 7) delete cache.cards[id];
@@ -1162,7 +1195,8 @@ async function findVideos() {
     applied = applyPicks(files, picks);
   }
   const summary =
-    `영상 없는 카드 ${cards.length}개 → 붙임 ${picks.size}개 (기록에서 ${stat.cached}개, 새로 찾음 ${stat.found}개), 못 찾음 ${stat.none}개, 기다리는 중 ${stat.waiting}개, 다음으로 미룸 ${stat.postponed}개 · 이번 검색 ${stat.searched}번 (하루 무료 한도 100번)` +
+    `영상 없는 카드 ${cards.length}개 → 붙임 ${picks.size - stat.older}개 (기록에서 ${stat.cached}개, 새로 찾음 ${stat.found}개), 못 찾음 ${stat.none}개, 기다리는 중 ${stat.waiting}개, 다음으로 미룸 ${stat.postponed}개 · 이번 검색 ${stat.searched}번 (하루 무료 한도 100번)` +
+    (stat.older ? ` · 지난 이슈 ${stat.older}개는 기록에서 이어 붙임` : '') +
     (write ? ` · 올릴 파일에 ${applied}곳 붙였어요 (저장소 원본은 그대로예요)` : ' · --write 가 없어서 파일은 바꾸지 않았어요');
   console.log(`✅ 영상 자동 찾기: ${summary}`);
 
