@@ -1,7 +1,16 @@
 {
   "schema": 1,
-  "revision": 2,
+  "revision": 3,
   "groups": [
+    {
+      "id": "issue",
+      "label": "화제 이슈",
+      "hint": "지금 관심과 기사가 급증한 이슈",
+      "icon": "issue",
+      "a1": "#C92A2A",
+      "a2": "#FF6B6B",
+      "since": 3
+    },
     {
       "id": "meme",
       "label": "밈·신조어",
@@ -17,7 +26,9 @@
       "icon": "ent",
       "a1": "#7B3FF2",
       "a2": "#B07BFF",
-      "replaces": ["screen"]
+      "replaces": [
+        "screen"
+      ]
     },
     {
       "id": "sports",
@@ -28,20 +39,15 @@
       "a2": "#2FC48D"
     },
     {
-      "id": "game",
-      "label": "게임",
-      "hint": "게임 속 유행과 이슈",
-      "icon": "game",
-      "a1": "#E8590C",
-      "a2": "#FFA94D"
-    },
-    {
       "id": "tech",
-      "label": "IT·과학",
-      "hint": "앱·기기·AI·우주·과학 소식",
+      "label": "IT·게임·과학",
+      "hint": "앱·기기·AI·게임·우주·과학 소식",
       "icon": "tech",
       "a1": "#243049",
-      "a2": "#5A6B91"
+      "a2": "#5A6B91",
+      "replaces": [
+        "game"
+      ]
     },
     {
       "id": "econ",
@@ -60,7 +66,9 @@
       "a1": "#F0A100",
       "a2": "#FFD25E",
       "ink": "#14161C",
-      "replaces": ["shop"]
+      "replaces": [
+        "shop"
+      ]
     },
     {
       "id": "world",

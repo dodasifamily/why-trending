@@ -112,6 +112,7 @@
     econ: '<path d="M4 20h16M6.5 20v-5M11 20v-8M15.5 20v-11"></path><path d="M5 9.5l4-3.5 3 2 6.5-4.5"></path><path d="M15 3.5h3.5V7"></path>',
     life: '<path d="M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z"></path><path d="M16 10.5h1.2a2.3 2.3 0 0 1 0 4.6H16"></path><path d="M8.5 3.5v2.2M12 3.5v2.2"></path><path d="M6.5 21h9"></path>',
     world: '<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.6 2.4 4 5.4 4 9s-1.4 6.6-4 9c-2.6-2.4-4-5.4-4-9s1.4-6.6 4-9z"></path>',
+    issue: '<path d="M12 3c1 3.2 4.5 5 4.5 9.2A4.5 4.5 0 0 1 12 17a4.5 4.5 0 0 1-4.5-4.8c0-1.6.7-2.8 1.6-3.7.2 1.2.8 1.9 1.6 2.2C10.5 7.6 11 5.3 12 3z"></path><path d="M8 21h8"></path>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"></path>'
   };
   function icon(name, size) {

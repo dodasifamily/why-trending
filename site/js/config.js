@@ -1,6 +1,6 @@
 // 앱 설정. 공개 저장소에 올라가므로 비밀 값은 절대 넣지 않아요.
 window.WT_CONFIG = {
-  appVersion: '0.3.6',
+  appVersion: '0.3.7',
 
   // 공유 링크와 앱의 최신 해설을 받아오는 주소 (GitHub Pages)
   siteUrl: 'https://dodasifamily.github.io/why-trending/',
