@@ -1,5 +1,6 @@
 {
   "schema": 1,
+  "revision": 2,
   "groups": [
     {
       "id": "meme",
@@ -11,19 +12,12 @@
     },
     {
       "id": "ent",
-      "label": "연예·음악",
-      "hint": "가수·아이돌·방송 속 화제",
+      "label": "연예",
+      "hint": "가수·배우·방송·영화·웹툰 화제",
       "icon": "ent",
       "a1": "#7B3FF2",
-      "a2": "#B07BFF"
-    },
-    {
-      "id": "screen",
-      "label": "드라마·영화·웹툰",
-      "hint": "화제가 된 작품과 장면",
-      "icon": "screen",
-      "a1": "#D6336C",
-      "a2": "#FF7AA8"
+      "a2": "#B07BFF",
+      "replaces": ["screen"]
     },
     {
       "id": "sports",
@@ -42,21 +36,40 @@
       "a2": "#FFA94D"
     },
     {
-      "id": "shop",
-      "label": "소비·먹거리",
-      "hint": "품절 대란, 신상, 핫플",
-      "icon": "shop",
-      "a1": "#F0A100",
-      "a2": "#FFD25E",
-      "ink": "#14161C"
-    },
-    {
       "id": "tech",
-      "label": "IT·테크",
-      "hint": "앱·기기·AI 소식",
+      "label": "IT·과학",
+      "hint": "앱·기기·AI·우주·과학 소식",
       "icon": "tech",
       "a1": "#243049",
       "a2": "#5A6B91"
+    },
+    {
+      "id": "econ",
+      "label": "경제",
+      "hint": "기업·산업·물가·유통 이야기",
+      "icon": "econ",
+      "a1": "#0B7285",
+      "a2": "#15AABF",
+      "since": 2
+    },
+    {
+      "id": "life",
+      "label": "생활·문화",
+      "hint": "먹거리·패션·여행·공연·책 이야기",
+      "icon": "life",
+      "a1": "#F0A100",
+      "a2": "#FFD25E",
+      "ink": "#14161C",
+      "replaces": ["shop"]
+    },
+    {
+      "id": "world",
+      "label": "세계",
+      "hint": "해외에서 화제가 된 소식",
+      "icon": "world",
+      "a1": "#D6336C",
+      "a2": "#FF7AA8",
+      "since": 2
     }
   ]
 }

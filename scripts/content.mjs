@@ -153,6 +153,8 @@ function loadCategories() {
   const where = 'categories.json';
   const cats = readJson(CATEGORIES_PATH);
   if (cats.schema !== 1) err(where, 'schema 는 1 이어야 해요');
+  // revision: 분야 구성을 크게 바꿀 때마다 1씩 올려요. 앱이 이 번호가 바뀐 걸 보면 옛 선택을 새 분야로 옮기고(replaces) 한 번 다시 고르게 안내해요.
+  if (cats.revision !== undefined && (!Number.isInteger(cats.revision) || cats.revision < 1)) err(where, 'revision 은 1 이상의 정수여야 해요');
   if (!Array.isArray(cats.groups) || cats.groups.length < 2 || cats.groups.length > 12) {
     err(where, 'groups 는 2~12개의 목록이어야 해요');
     return cats;
@@ -169,9 +171,25 @@ function loadCategories() {
     if (typeof g.icon !== 'string' || !/^[a-z]{2,12}$/.test(g.icon)) err(w, 'icon 은 영문 소문자 이름이어야 해요');
     for (const k of ['a1', 'a2']) if (typeof g[k] !== 'string' || !HEX_COLOR.test(g[k])) err(w, `${k} 는 #RRGGBB 색이어야 해요`);
     if (g.ink !== undefined && (typeof g.ink !== 'string' || !HEX_COLOR.test(g.ink))) err(w, 'ink 는 #RRGGBB 색이어야 해요');
+    // replaces: 이 분야가 대신하게 된 옛 분야 id. 앱이 옛 선택을 새 분야로 옮길 때 써요. since: 이 분야가 생긴 revision(그 revision 에만 '새 분야' 표시가 붙어요)
+    if (g.replaces !== undefined && (!Array.isArray(g.replaces) || g.replaces.length > 6 || !g.replaces.every((x) => typeof x === 'string' && /^[a-z][a-z0-9]{1,11}$/.test(x)))) {
+      err(w, 'replaces 는 없어진 옛 분야 id(영문 소문자) 목록이어야 해요');
+    }
+    if (g.since !== undefined && (!Number.isInteger(g.since) || g.since < 1 || g.since > (Number.isInteger(cats.revision) ? cats.revision : 1))) {
+      err(w, 'since 는 이 분야가 생긴 revision 번호(1 이상, 지금 revision 이하)여야 해요');
+    }
   });
   const labels = cats.groups.map((g) => g && g.label);
   if (new Set(labels).size !== labels.length) err(where, '분야 이름(label)이 겹쳐요');
+  const replacedBy = new Map();
+  for (const g of cats.groups) {
+    if (!g || !Array.isArray(g.replaces)) continue;
+    for (const old of g.replaces) {
+      if (ids.has(old)) err(where, `replaces 에 적은 ${old} 는 지금도 있는 분야예요`);
+      else if (replacedBy.has(old)) err(where, `옛 분야 ${old} 를 ${replacedBy.get(old)} 와 ${g.id} 가 함께 대신한다고 적혀 있어요`);
+      else replacedBy.set(old, g.id);
+    }
+  }
   GROUPS = [...ids];
   return cats;
 }

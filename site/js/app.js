@@ -45,6 +45,8 @@
     groups: null, // 분야 목록 (categories.json 의 groups)
     groupsState: 'loading', // loading | ok | error
     cats: cleanCats(store.get('cats', null)), // 내가 고른 분야 id 목록. null 이면 아직 고르지 않은 거예요(첫 실행)
+    rev: 0, // 지금 받은 분야 목록의 구성 번호 (categories.json 의 revision)
+    revNotice: false, // 분야 구성이 새로 바뀐 직후 한 번, 옛 선택을 새 분야로 옮겼다고 알리고 다시 고르게 해요
     recent: null, // 최근 14일 해설 (recent.json)
     dictGroup: 'all', // 사전에서 보고 있는 분야 ('all' = 전체)
     alertOn: store.get('alertOn', false) === true,
@@ -107,6 +109,9 @@
     game: '<path d="M7 7h10a4.5 4.5 0 0 1 4.4 5.4l-.8 4a2.6 2.6 0 0 1-4.6.9L14.6 15H9.4l-1.4 2.3a2.6 2.6 0 0 1-4.6-.9l-.8-4A4.5 4.5 0 0 1 7 7z"></path><path d="M8 10v3M6.5 11.5h3"></path><path d="M15.5 10.5h.01M17.5 12.5h.01"></path>',
     shop: '<path d="M5.5 8h13l1 12h-15z"></path><path d="M9 8V7a3 3 0 0 1 6 0v1"></path>',
     tech: '<rect x="7" y="7" width="10" height="10" rx="2"></rect><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"></path>',
+    econ: '<path d="M4 20h16M6.5 20v-5M11 20v-8M15.5 20v-11"></path><path d="M5 9.5l4-3.5 3 2 6.5-4.5"></path><path d="M15 3.5h3.5V7"></path>',
+    life: '<path d="M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z"></path><path d="M16 10.5h1.2a2.3 2.3 0 0 1 0 4.6H16"></path><path d="M8.5 3.5v2.2M12 3.5v2.2"></path><path d="M6.5 21h9"></path>',
+    world: '<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.6 2.4 4 5.4 4 9s-1.4 6.6-4 9c-2.6-2.4-4-5.4-4-9s1.4-6.6 4-9z"></path>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"></path>'
   };
   function icon(name, size) {
@@ -228,6 +233,7 @@
         .then((j) => {
           S.groups = j.groups;
           S.groupsState = 'ok';
+          applyRevision(j);
         })
         .catch(() => {
           if (!S.groups) S.groupsState = 'error'; // 분야를 못 받으면 분야 걸러내기 없이 전부 보여줘요
@@ -314,6 +320,29 @@
   function onCatsChanged() {
     // 고른 분야가 바뀌면 푸시 알림 구독도 맞춰요 (푸시를 쓰는 앱이고 알림이 켜져 있을 때만)
     if (S.alertOn && fcm()) syncPush().catch(() => {});
+  }
+  /**
+   * 분야 구성이 새로 바뀌면(categories.json 의 revision 이 올라가면) 옛 선택을 새 분야로 옮겨요.
+   * 없어진 분야 id 는 새 분야의 replaces 에 적혀 있어요(예: screen → ent). 옮길 게 있으면 한 번 확인하도록 안내하고,
+   * 옮길 게 하나도 없으면 처음 실행처럼 분야부터 고르게 돼요. 처음 쓰는 사람에게는 아무 일도 없어요.
+   */
+  function applyRevision(j) {
+    const rev = j && Number.isInteger(j.revision) && j.revision >= 1 ? j.revision : 0;
+    S.rev = rev;
+    if (!rev || store.get('catsRev', 0) === rev) return;
+    if (S.cats) {
+      const ids = j.groups.map((g) => g.id);
+      const next = new Set();
+      S.cats.forEach((id) => {
+        if (ids.includes(id)) next.add(id);
+        else j.groups.forEach((g) => Array.isArray(g.replaces) && g.replaces.includes(id) && next.add(g.id));
+      });
+      S.cats = ids.filter((id) => next.has(id));
+      store.set('cats', S.cats);
+      if (S.cats.length) S.revNotice = true;
+      onCatsChanged();
+    }
+    store.set('catsRev', rev);
   }
   /** '드라마·영화·웹툰' 처럼 가운뎃점이 든 이름은 점 뒤에서만 줄이 바뀌게 해요 */
   function labelNodes(label) {
@@ -520,6 +549,10 @@
   function renderToday(keepScroll) {
     document.title = '왜이슈? – 요즘 뜨는 말, 30초 해설';
     if (S.today && needsPick()) return renderPicker(true); // 처음 실행하면 관심 분야부터 골라요
+    if (S.today && S.revNotice && myCats()) {
+      S.revNotice = false; // 분야가 바뀐 걸 알리는 화면은 한 번만 보여줘요
+      return renderPicker(false, true);
+    }
     const nodes = [brandRow(S.today ? koDate(S.today.date) : ''), h('h1', { class: 'hero' }, '요즘 뜨는 말,', h('br'), h('span', { class: 'hl' }, '30초 해설'))];
 
     if (!S.today) {
@@ -552,7 +585,8 @@
 
   // ---------- 관심 분야 고르기 ----------
   // first=true: 처음 실행했을 때 오늘 화면 자리에서 보여줘요. false: '바꾸기'를 눌러 들어온 화면(#/pick)
-  function renderPicker(first) {
+  // revised=true: 분야 구성이 새로 바뀐 뒤 처음 열 때(옛 선택을 새 분야로 옮겨 두었고, 새로 생긴 분야에 '새 분야' 표시를 달아요)
+  function renderPicker(first, revised) {
     document.title = first ? '왜이슈? – 관심 분야 고르기' : '내 분야 – 왜이슈?';
     if (!S.groups) {
       setView([
@@ -583,17 +617,19 @@
           }
         },
         h('span', { class: 'pico', style: `background:linear-gradient(135deg,${col.a1},${col.a2});color:${col.ink}`, 'aria-hidden': 'true' }, icon(g.icon, 24)),
-        h('span', { class: 'ptxt' }, h('span', { class: 'pl1' }, labelNodes(g.label)), h('span', { class: 'pl2' }, g.hint)),
+        h('span', { class: 'ptxt' }, h('span', { class: 'pl1' }, labelNodes(g.label), revised && S.rev && g.since === S.rev ? h('span', { class: 'pnew' }, '새 분야') : null), h('span', { class: 'pl2' }, g.hint)),
         h('span', { class: 'pcheck', 'aria-hidden': 'true' }, icon('check', 16))
       );
       return btn;
     });
 
+    // 분야가 새로 바뀐 안내(revised)는 오늘 화면 자리에서 보여주니, 끝나면 history 를 되돌리지 않고 오늘 화면으로 바로 가요
+    const leave = revised ? () => go('/', true) : backToList;
     const finish = () => {
       if (first) renderToday(false);
       else {
         toast('내 분야를 저장했어요');
-        backToList();
+        leave();
       }
     };
     const hint = h('p', { class: 'pickhint', role: 'status' });
@@ -631,7 +667,11 @@
 
     const head = first
       ? [brandRow(''), h('h1', { class: 'h2big pickh' }, '어떤 얘기가 궁금하세요?'), h('p', { class: 'sub' }, '관심 있는 분야를 고르면 그 분야의 새 이슈를 먼저 보여드려요. 나중에 언제든 바꿀 수 있어요.')]
-      : [h('div', { class: 'topbar' }, h('button', { class: 'back', type: 'button', onclick: backToList }, icon('left', 22), '뒤로')), h('h1', { class: 'h2big' }, '내 분야'), h('p', { class: 'sub' }, '고른 분야의 이슈만 오늘 화면에 보여드려요.')];
+      : [
+          h('div', { class: 'topbar' }, h('button', { class: 'back', type: 'button', onclick: leave }, icon('left', 22), '뒤로')),
+          h('h1', { class: 'h2big' }, revised ? '분야가 새로 바뀌었어요' : '내 분야'),
+          h('p', { class: 'sub' }, revised ? `포털 뉴스처럼 ${groups.length}개 분야로 정리했어요. 지난번에 고른 분야는 새 분야로 옮겨 뒀어요. 확인하고 저장해 주세요.` : '고른 분야의 이슈만 오늘 화면에 보여드려요.')
+        ];
     setView(
       [
         head,

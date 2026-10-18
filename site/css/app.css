@@ -527,6 +527,7 @@ a { color: inherit; }
 .pico { flex: none; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; }
 .ptxt { flex: 1; min-width: 0; }
 .pl1 { display: block; font-size: 16px; font-weight: 700; }
+.pnew { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--cobalt); color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5; vertical-align: 2px; }
 .pl2 { display: block; margin-top: 1px; font-size: 13px; line-height: 1.4; color: var(--muted); }
 .pcheck {
   flex: none;
