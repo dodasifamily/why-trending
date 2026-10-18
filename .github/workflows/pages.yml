@@ -46,6 +46,31 @@ jobs:
       - name: 최근 14일 해설 목록 만들기
         run: node scripts/content.mjs recent
 
+      # 영상 자동 찾기 기록(어느 카드에 어떤 영상을 붙였는지, 못 찾은 카드는 언제 찾아봤는지)을 이어 써요.
+      # 유튜브가 하루 무료 검색을 100번으로 제한해서, 같은 카드를 올릴 때마다 다시 검색하지 않으려고 해요.
+      - name: 영상 찾기 기록 불러오기
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/video-picks.json
+          key: video-picks-${{ github.run_id }}
+          restore-keys: |
+            video-picks-
+
+      # 영상이 없는 카드에 이번 소식을 다룬 영상을 유튜브 검색으로 찾아 붙여요. 올리는 사이트에만 붙이고, 저장소의 해설 글은 그대로예요.
+      # 저장소 Settings → Secrets and variables → Actions 에 YOUTUBE_API_KEY 가 없으면 건너뛰어요. 이 단계가 실패해도 사이트는 올라가요.
+      - name: 영상 자동 찾기 (유튜브 검색 키가 있을 때만)
+        continue-on-error: true
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: node scripts/content.mjs find-videos --write
+
+      - name: 영상 찾기 기록 저장
+        if: always() && hashFiles('.cache/video-picks.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/video-picks.json
+          key: video-picks-${{ github.run_id }}
+
       # 해설에 붙인 유튜브 영상이 지워졌거나 다른 곳에서 재생이 막혔다면, 그 영상만 빼고 올려요(해설 글은 그대로 올라가요).
       # 유튜브에 물어볼 수 없는 상황이면 아무것도 빼지 않고 건너뛰어요. 이 단계가 실패해도 사이트는 올라가요.
       - name: 영상 확인 (재생이 안 되는 영상은 빼고 올리기)

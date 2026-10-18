@@ -8,18 +8,23 @@
 //   node scripts/content.mjs add <카드목록.json>     검사를 통과한 지난 카드를 사전(terms.json)에만 추가 (오늘 카드는 today.json + merge 로 올려요)
 //   node scripts/content.mjs verify-media [--prune]  카드에 붙인 유튜브 영상이 실제로 있고 다른 곳에서 재생이 허용되는지 유튜브에 물어봐요
 //                                                     (인터넷이 되는 GitHub Actions 에서 써요. --prune 이면 막힌 영상만 올릴 파일에서 빼요)
+//   node scripts/content.mjs find-videos [--write] [--cache <파일>]   영상이 없는 카드에 이번 소식 영상을 유튜브 검색(키: 환경변수 YOUTUBE_API_KEY)으로 찾아 붙여요
+//                                                     (GitHub Actions 에서 써요. --write 가 있어야 올릴 파일을 바꿔요. 키가 없으면 건너뛰어요)
 //
 // 옵션: --site <폴더>   기본값은 site
 //
 // 규칙의 목적: 출처 없는 내용, 민감한 주제, 너무 긴 글, 올린 곳이 불분명한 영상, 며칠 전·지난달 기사에 기댄 '오늘 소식'이 앱에 올라가지 않게 막는 안전장치예요.
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
 
 const argv = process.argv.slice(2);
 const command = argv[0];
-const siteIdx = argv.indexOf('--site');
-const siteDir = resolve(siteIdx >= 0 ? argv[siteIdx + 1] : 'site');
+const argValue = (name) => {
+  const i = argv.indexOf(name);
+  return i >= 0 ? argv[i + 1] : undefined;
+};
+const siteDir = resolve(argValue('--site') || 'site');
 const TODAY_PATH = join(siteDir, 'data', 'today.json');
 const TERMS_PATH = join(siteDir, 'data', 'terms.json');
 const CATEGORIES_PATH = join(siteDir, 'data', 'categories.json');
@@ -664,15 +669,20 @@ function dice(a, b) {
 // GitHub Actions 의 줄 메모(annotation)에 넣을 글자 처리
 const ghEsc = (s) => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
 
-async function verifyMedia() {
-  const prune = argv.includes('--prune');
-  const files = [
+// 올릴 카드 파일 세 개(오늘·사전·최근 목록)를 읽어요. 있는 것만요.
+function siteFiles() {
+  return [
     { path: TODAY_PATH, list: (j) => j.cards },
     { path: TERMS_PATH, list: (j) => j.terms },
     { path: RECENT_PATH, list: (j) => j.cards }
   ]
     .filter((f) => existsSync(f.path))
     .map((f) => ({ ...f, json: readJson(f.path) }));
+}
+
+async function verifyMedia() {
+  const prune = argv.includes('--prune');
+  const files = siteFiles();
 
   // 카드의 영상은 두 곳이에요: media(뉴스·공식 채널 영상 1개), clips(밈 카드의 많이 본 관련 영상)
   const videosOf = (c) => [...(c && Array.isArray(c.media) ? c.media.slice(0, 1) : []), ...(c && Array.isArray(c.clips) ? c.clips : [])];
@@ -768,6 +778,346 @@ async function verifyMedia() {
   }
 }
 
+// ---------- 영상 자동 찾기 (유튜브 검색 키가 있을 때만) ----------
+// 사이트를 올릴 때 영상이 없는 카드에 '이번 소식'을 다룬 영상을 유튜브 검색(YouTube Data API v3)으로 찾아 붙여요. (2026-10-18 사용자 요청)
+//  - 뉴스·행사 카드: 방송·언론사 채널(NEWS_CHANNELS)이 카드 날짜 앞 7일~뒤 3일 안에 올린 영상 중 제목에 키워드가 든 것 1개를 media 로 붙여요.
+//    유튜브 검색에는 같은 행사·경매의 지난해 영상도 섞여 나와서, 날짜 범위·제목의 연도·키워드를 모두 따져요.
+//  - 밈·신조어 카드: 조회수 CLIP_MIN_VIEWS 이상이고 제목에 키워드가 그대로 든 영상을 조회수 순으로 CLIP_MAX 개까지 clips 로 붙여요.
+//  - 공통: 공개·재생 허용·생중계 아님·연령 제한 없음·아이용 표시 없음·한국에서 재생 가능·길이 제한·금지어 없음.
+//    붙이기 전에 validateMedia·validateClips 로 한 번 더 검사해요.
+//  - 구글이 2026년 6월부터 검색(search.list)을 하루 100번까지만 무료로 줘서, 영상이 없는 카드만 찾고 한 번에 FIND_MAX_SEARCHES 번까지만 써요.
+//    결과(못 찾은 것도)는 --cache 파일에 적어 두고 GitHub Actions 캐시로 이어 써서, 같은 카드를 FIND_RETRY_HOURS 시간 안에는 다시 검색하지 않아요.
+//  - --write 가 있을 때만 올릴 파일(today·terms·recent)에 붙여요. 저장소 원본에는 커밋하지 않아요.
+//    유튜브 API 이용약관(받아 둔 정보는 30일 안에 새로 받거나 지우기)에 맞게 기록은 FIND_KEEP_DAYS 일만 써요.
+//  - 키(YOUTUBE_API_KEY)가 없거나 오류가 나면 건너뛰어요(사이트는 그대로 올라가요). 키는 로그에 찍지 않아요.
+const YT_API_URL = (process.env.YT_API_URL || 'https://www.googleapis.com/youtube/v3').replace(/\/+$/, '');
+const FIND_MAX_SEARCHES = Number(process.env.FIND_VIDEOS_MAX_SEARCHES) > 0 ? Number(process.env.FIND_VIDEOS_MAX_SEARCHES) : 12;
+const FIND_RETRY_HOURS = 6; // 못 찾은 카드는 이만큼 지나야 다시 검색해요
+const FIND_KEEP_DAYS = 14; // 찾은 영상 기록을 쓰는 기간
+const FIND_NEWS_DAYS_BEFORE = 7; // 뉴스 영상은 카드 날짜보다 이만큼 앞서 올라온 것부터
+const FIND_NEWS_DAYS_AFTER = 3; // 카드 날짜 뒤로 이만큼(당일 포함해 +1일)까지
+const FIND_MIN_SECONDS = 10;
+const FIND_NEWS_MAX_SECONDS = 15 * 60;
+const FIND_CLIP_MAX_SECONDS = 20 * 60;
+const FIND_CLIP_MIN_KEYWORD = 3; // 밈 키워드가 이보다 짧으면(예: '야르') 다른 뜻의 영상이 섞일 수 있어서 자동으로 붙이지 않아요
+const VIDEO_BLOCK_IDS = []; // 문제가 알려진 영상 번호: 자동으로 붙이지 않아요 (이상한 영상이 보이면 여기에 번호를 추가해요)
+const VIDEO_BLOCK_CHANNELS = []; // 자동으로 붙이지 않을 채널 이름
+const DAY_MS = 86400000;
+
+const needsVideo = (c) => !!c && !(Array.isArray(c.media) && c.media.length) && !(Array.isArray(c.clips) && c.clips.length);
+const codePoint = (n) => (Number.isInteger(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '');
+
+// 유튜브 검색 결과의 제목에는 &#39; 같은 HTML 문자가 섞여 있어요
+function htmlDecode(s) {
+  return String(s || '')
+    .replace(/&#(\d+);/g, (_, n) => codePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => codePoint(parseInt(n, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+// 유튜브의 길이 표기(PT1H2M3S)를 초로 바꿔요. 읽을 수 없으면 null
+function isoSeconds(d) {
+  const m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(String(d || ''));
+  if (!m) return null;
+  return Number(m[1] || 0) * 86400 + Number(m[2] || 0) * 3600 + Number(m[3] || 0) * 60 + Number(m[4] || 0);
+}
+
+// 유튜브 API 한 번 부르기. 주소(키가 들어 있어요)는 로그에 남기지 않고, 상태와 이유만 돌려줘요.
+async function ytGet(endpoint, params, key) {
+  const url = new URL(`${YT_API_URL}/${endpoint}`);
+  for (const [k, v] of Object.entries(params)) if (v !== undefined) url.searchParams.set(k, String(v));
+  url.searchParams.set('key', key);
+  let last = { status: 0, reason: 'network' };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { 'user-agent': 'whyttuji-find-videos/1.0' } });
+      let body = null;
+      try {
+        body = await res.json();
+      } catch {
+        /* 본문이 JSON 이 아니면 비워 둬요 */
+      }
+      if (res.ok) return { status: res.status, body };
+      const e = body && body.error;
+      const reason =
+        (e && Array.isArray(e.errors) && e.errors[0] && e.errors[0].reason) ||
+        (e && Array.isArray(e.details) && e.details[0] && e.details[0].reason) ||
+        (e && e.status) ||
+        '';
+      last = { status: res.status, reason: String(reason) };
+      if (res.status < 500) return last;
+    } catch (e) {
+      last = { status: 0, reason: 'network', detail: String((e && e.cause && e.cause.code) || (e && e.name) || '') };
+    }
+    if (attempt === 0) await sleep(1500);
+  }
+  return last;
+}
+
+function ytProblemText(r) {
+  const reason = r.reason || '';
+  const why = `응답 ${r.status}${reason ? ', ' + reason : ''}${r.detail ? ', ' + r.detail : ''}`;
+  if (/quota|rateLimit|dailyLimit/i.test(reason)) return `오늘 유튜브 검색 한도(하루 100번)를 다 썼어요 (${why}). 내일 다시 찾아요`;
+  if (/keyInvalid|API_KEY_INVALID|keyExpired/i.test(reason)) return `유튜브가 키를 받아들이지 않았어요 (${why}). 키를 다시 복사해 YOUTUBE_API_KEY 로 넣었는지 확인해 주세요`;
+  if (/referer|referrer|IP_ADDRESS_BLOCKED|APP_BLOCKED/i.test(reason)) return `이 키는 '애플리케이션 제한사항'이 걸려 있어서 사이트 올리기 서버에서는 못 써요 (${why}). 구글 클라우드의 이 키 설정에서 '애플리케이션 제한사항'을 '없음'으로 바꿔 주세요 (대신 'API 제한사항'은 'YouTube Data API v3' 하나만 두세요)`;
+  if (r.status === 401 || r.status === 403) return `유튜브가 요청을 거절했어요 (${why}). 'YouTube Data API v3' 가 사용 상태인지, 키의 API 제한사항에 'YouTube Data API v3' 가 들어 있는지 확인해 주세요`;
+  if (r.status === 0 || r.status >= 500) return `유튜브에 연결하지 못했어요 (${why}). 다음에 다시 찾아요`;
+  return `유튜브가 요청을 받아들이지 않았어요 (${why})`;
+}
+
+// 영상 제목이 카드 키워드와 얼마나 맞는지(0~1). 0 이면 쓰지 않아요.
+//  - 밈·신조어(clips): 키워드가 제목에 그대로 들어 있어야 해요 (validateClips 와 같은 규칙).
+//  - 뉴스·행사(news): 키워드를 띄어쓰기로 나눈 말 가운데 가장 긴 말(사람·행사·제품 이름)은 꼭 들어 있고, 전체의 2/3 이상이 들어 있어야 해요.
+function keywordFit(card, title, mode) {
+  const full = textKey(card.keyword);
+  const tk = textKey(title);
+  if (!full) return 0;
+  if (mode === 'clips') return tk.includes(full) ? 1 : 0;
+  const tokens = String(card.keyword).split(/\s+/).map(textKey).filter((t) => t.length >= 2);
+  if (!tokens.length) return tk.includes(full) ? 1 : 0;
+  const longest = tokens.reduce((a, b) => (b.length > a.length ? b : a));
+  if (!tk.includes(longest)) return 0;
+  const hit = tokens.filter((t) => tk.includes(t)).length;
+  const need = tokens.length <= 2 ? tokens.length : Math.ceil((tokens.length * 2) / 3);
+  return hit >= need ? hit / tokens.length : 0;
+}
+
+// videos.list 가 돌려준 영상 하나가 이 카드에 붙여도 되는지 따져요. 되면 { v }, 안 되면 { why }
+function evaluateVideo(it, card, mode) {
+  const sn = (it && it.snippet) || {};
+  const cd = (it && it.contentDetails) || {};
+  const st = (it && it.status) || {};
+  const id = it && typeof it.id === 'string' ? it.id : '';
+  if (!YOUTUBE_ID.test(id)) return { why: '번호 형식' };
+  if (VIDEO_BLOCK_IDS.includes(id)) return { why: '막아 둔 영상' };
+  const channel = htmlDecode(sn.channelTitle).trim();
+  const title = htmlDecode(sn.title).trim();
+  if (!channel || !title) return { why: '제목·채널 없음' };
+  if (channel.length > VIDEO_CHANNEL_MAX) return { why: '채널 이름이 너무 길어요' };
+  if (VIDEO_BLOCK_CHANNELS.some((x) => normName(x) === normName(channel))) return { why: '막아 둔 채널' };
+  if (mode === 'news' && !NEWS_CHANNEL_KEYS.has(normName(channel))) return { why: '허용 채널 아님' };
+  if (sn.liveBroadcastContent && sn.liveBroadcastContent !== 'none') return { why: '생중계' };
+  if (st.privacyStatus !== 'public' || st.embeddable !== true) return { why: '재생 허용 안 됨' };
+  if (st.madeForKids === true) return { why: '아이용 영상' };
+  if (cd.contentRating && cd.contentRating.ytRating === 'ytAgeRestricted') return { why: '연령 제한' };
+  const rr = cd.regionRestriction;
+  if (rr && ((Array.isArray(rr.blocked) && rr.blocked.includes('KR')) || (Array.isArray(rr.allowed) && !rr.allowed.includes('KR')))) return { why: '한국에서 막힘' };
+  const seconds = isoSeconds(cd.duration);
+  if (seconds === null || seconds < FIND_MIN_SECONDS || seconds > (mode === 'news' ? FIND_NEWS_MAX_SECONDS : FIND_CLIP_MAX_SECONDS)) return { why: '길이' };
+  const published = Date.parse(sn.publishedAt);
+  if (!Number.isFinite(published)) return { why: '올린 날 없음' };
+  if (BLOCKED_WORDS.some((w) => title.includes(w) || channel.includes(w))) return { why: '금지어' };
+  if (VIDEO_TITLE_BLOCKED.test(title) || VIDEO_TITLE_BLOCKED.test(channel)) return { why: '반응·모음·자극적인 제목' };
+  const fit = keywordFit(card, title, mode);
+  if (!fit) return { why: '제목에 키워드 없음' };
+  const views = Number(it.statistics && it.statistics.viewCount);
+  if (mode === 'news') {
+    const start = Date.parse(`${card.date}T00:00:00+09:00`);
+    if (published < start - FIND_NEWS_DAYS_BEFORE * DAY_MS || published > start + (FIND_NEWS_DAYS_AFTER + 1) * DAY_MS) return { why: '날짜 범위 밖' };
+    const cardYear = Number(card.date.slice(0, 4));
+    if ([...title.matchAll(/(?<![0-9])(20\d{2})(?![0-9])/g)].some((m) => Number(m[1]) < cardYear)) return { why: '지난 연도 제목' };
+  } else {
+    if (!(views >= CLIP_MIN_VIEWS)) return { why: '조회수 모자람' };
+    const around = [title, channel, ...(Array.isArray(sn.tags) ? sn.tags : []), String(sn.description || '').slice(0, 400)].join(' ');
+    if (CLIP_TITLE_BLOCKED.test(around)) return { why: '아이(미성년자) 단서' };
+  }
+  return { v: { id, channel, title: title.slice(0, VIDEO_TITLE_MAX), published, views: Number.isFinite(views) ? Math.floor(views) : 0, fit } };
+}
+
+// 통과한 영상 가운데 카드에 붙일 것을 골라요. 뉴스는 1개(media), 밈은 조회수 순 CLIP_MAX 개(clips, 채널이 겹치지 않게 먼저)
+function chooseVideos(passed, mode) {
+  if (!passed.length) return null;
+  if (mode === 'news') {
+    const best = [...passed].sort((a, b) => b.fit - a.fit || b.views - a.views || b.published - a.published)[0];
+    return { media: { type: 'video', provider: 'youtube', id: best.id, kind: 'news', channel: best.channel, title: best.title }, info: [best] };
+  }
+  const sorted = [...passed].sort((a, b) => b.views - a.views);
+  const out = [];
+  for (const v of sorted) if (out.length < CLIP_MAX && !out.some((x) => normName(x.channel) === normName(v.channel))) out.push(v);
+  for (const v of sorted) if (out.length < CLIP_MAX && !out.includes(v)) out.push(v);
+  return { clips: out.map((v) => ({ type: 'video', provider: 'youtube', id: v.id, channel: v.channel, title: v.title, views: v.views })), info: out };
+}
+
+// 고른 영상이 카드 검사 규칙(validateMedia·validateClips)을 통과하는지 확인해요. 걸린 이유 목록을 돌려줘요.
+function pickProblems(card, pick) {
+  const probe = { ...card };
+  delete probe.media;
+  delete probe.clips;
+  if (pick.media) probe.media = [pick.media];
+  if (pick.clips) probe.clips = pick.clips;
+  const before = errors.length;
+  validateMedia(probe, 'pick');
+  validateClips(probe, 'pick');
+  return errors.splice(before);
+}
+
+// 카드 하나에 대해 검색(search.list 1번) + 세부 정보(videos.list 1번)로 영상을 찾아요.
+async function searchPick(card, mode, key, stat) {
+  const meme = mode === 'clips';
+  const start = Date.parse(`${card.date}T00:00:00+09:00`);
+  const params = {
+    part: 'snippet',
+    type: 'video',
+    q: card.keyword,
+    maxResults: 50,
+    regionCode: 'KR',
+    videoEmbeddable: 'true',
+    videoSyndicated: 'true',
+    safeSearch: 'strict',
+    order: meme ? 'viewCount' : 'relevance'
+  };
+  if (/[가-힣]/.test(card.keyword)) params.relevanceLanguage = 'ko';
+  if (!meme && Number.isFinite(start)) params.publishedAfter = new Date(start - FIND_NEWS_DAYS_BEFORE * DAY_MS).toISOString();
+  stat.searched++;
+  const s = await ytGet('search', params, key);
+  if (s.status !== 200) return { problem: s };
+  const items = s.body && Array.isArray(s.body.items) ? s.body.items : [];
+  const ids = [...new Set(items.map((x) => x && x.id && x.id.videoId).filter((v) => typeof v === 'string' && YOUTUBE_ID.test(v)))].slice(0, 50);
+  if (!ids.length) return { pick: null, why: '검색 결과가 없어요' };
+  await sleep(200);
+  const d = await ytGet('videos', { part: 'snippet,contentDetails,status,statistics', id: ids.join(',') }, key);
+  if (d.status !== 200) return { problem: d };
+  const details = d.body && Array.isArray(d.body.items) ? d.body.items : [];
+  const passed = [];
+  const why = {};
+  for (const it of details) {
+    const r = evaluateVideo(it, card, mode);
+    if (r.v) passed.push(r.v);
+    else why[r.why] = (why[r.why] || 0) + 1;
+  }
+  const chosen = chooseVideos(passed, mode);
+  if (!chosen) {
+    const top = Object.entries(why).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${k} ${n}`).join(', ');
+    return { pick: null, why: `후보 ${details.length}개가 모두 안 맞았어요 (${top || '이유 없음'})` };
+  }
+  const problems = pickProblems(card, chosen);
+  if (problems.length) return { pick: null, why: `카드 검사에 걸렸어요: ${problems[0]}` };
+  return { pick: { pick: chosen.media ? { media: chosen.media } : { clips: chosen.clips }, info: chosen.info } };
+}
+
+function applyPicks(files, picks) {
+  let count = 0;
+  for (const f of files) {
+    let changed = false;
+    for (const c of f.list(f.json) || []) {
+      const p = c && picks.get(c.id);
+      if (!p || !needsVideo(c)) continue;
+      if (p.media) c.media = [p.media];
+      else if (p.clips) c.clips = p.clips;
+      else continue;
+      changed = true;
+      count++;
+    }
+    if (changed) writeJson(f.path, f.json);
+  }
+  return count;
+}
+
+async function findVideos() {
+  const write = argv.includes('--write');
+  const key = String(process.env.YOUTUBE_API_KEY || '').trim();
+  if (!key) {
+    console.log('::notice title=영상 자동 찾기를 건너뛰었어요::YOUTUBE_API_KEY 가 없어요. 저장소 Settings → Secrets and variables → Actions 에 유튜브 검색 키를 YOUTUBE_API_KEY 라는 이름으로 넣으면 켜져요');
+    return;
+  }
+  const files = siteFiles();
+  const source = files.find((f) => f.path === RECENT_PATH) || files.find((f) => f.path === TODAY_PATH);
+  if (!source) return console.log('ℹ️ 카드 목록 파일이 없어서 영상 자동 찾기를 건너뛰었어요');
+  const cards = (source.list(source.json) || []).filter((c) => c && typeof c.id === 'string' && typeof c.keyword === 'string' && isRealDate(c.date) && needsVideo(c));
+
+  const cachePath = resolve(argValue('--cache') || '.cache/video-picks.json');
+  let cache = { v: 1, cards: {} };
+  try {
+    const j = JSON.parse(readFileSync(cachePath, 'utf8'));
+    if (j && j.v === 1 && j.cards && typeof j.cards === 'object' && !Array.isArray(j.cards)) cache = j;
+  } catch {
+    /* 처음이거나 읽을 수 없으면 새로 시작해요 */
+  }
+  const parsedNow = process.env.FV_NOW ? Date.parse(process.env.FV_NOW) : NaN;
+  const now = Number.isFinite(parsedNow) ? parsedNow : Date.now();
+  const nowIso = new Date(now).toISOString();
+
+  const picks = new Map(); // 카드 id -> { media | clips, info, cached }
+  const stat = { cached: 0, searched: 0, found: 0, none: 0, waiting: 0, postponed: 0 };
+  let stopped = '';
+  const deadline = Date.now() + 4 * 60 * 1000; // 인터넷이 느려도 이 단계가 오래 붙잡지 않게
+  for (const card of cards) {
+    const sig = `${card.keyword}|${card.date}`;
+    const hit = cache.cards[card.id];
+    if (hit && hit.sig === sig) {
+      const stamp = Date.parse(hit.fetchedAt || hit.searchedAt);
+      if (hit.pick && Number.isFinite(stamp) && (now - stamp) / DAY_MS <= FIND_KEEP_DAYS && !pickProblems(card, hit.pick).length) {
+        picks.set(card.id, { ...hit.pick, info: Array.isArray(hit.info) ? hit.info : [], cached: true });
+        stat.cached++;
+        continue;
+      }
+      if (!hit.pick && (now - Date.parse(hit.searchedAt)) / 3600000 < FIND_RETRY_HOURS) {
+        stat.waiting++;
+        continue;
+      }
+    }
+    if (stopped || stat.searched >= FIND_MAX_SEARCHES || Date.now() > deadline) {
+      stat.postponed++;
+      continue;
+    }
+    const mode = CLIP_GROUPS.includes(card.group) ? 'clips' : 'news';
+    if (mode === 'clips' && textKey(card.keyword).length < FIND_CLIP_MIN_KEYWORD) {
+      cache.cards[card.id] = { sig, searchedAt: nowIso, pick: null };
+      stat.none++;
+      console.log(`  ${card.id} (${card.keyword}): 키워드가 짧아서(${FIND_CLIP_MIN_KEYWORD}글자 미만) 자동으로 찾지 않아요`);
+      continue;
+    }
+    const r = await searchPick(card, mode, key, stat);
+    if (r.problem) {
+      stopped = ytProblemText(r.problem);
+      console.log(`::warning title=영상 자동 찾기를 멈췄어요::${ghEsc(stopped)}`);
+      stat.postponed++;
+      continue;
+    }
+    if (r.pick) {
+      cache.cards[card.id] = { sig, searchedAt: nowIso, fetchedAt: nowIso, pick: r.pick.pick, info: r.pick.info };
+      picks.set(card.id, { ...r.pick.pick, info: r.pick.info });
+      stat.found++;
+    } else {
+      cache.cards[card.id] = { sig, searchedAt: nowIso, pick: null };
+      stat.none++;
+      console.log(`  ${card.id} (${card.keyword}): 맞는 영상을 못 찾았어요 — ${r.why}`);
+    }
+    await sleep(200);
+  }
+
+  // 지금 영상이 필요 없는 카드·오래된 기록은 정리해요
+  const want = new Set(cards.map((c) => c.id));
+  for (const id of Object.keys(cache.cards)) {
+    const e = cache.cards[id];
+    if (!want.has(id) || !e || (now - Date.parse(e.searchedAt)) / DAY_MS > FIND_KEEP_DAYS + 7) delete cache.cards[id];
+  }
+
+  const lines = [];
+  for (const [id, p] of picks) {
+    for (const v of p.info || []) {
+      lines.push(`${id} | ${p.media ? '뉴스 영상' : '많이 본 영상'} | ${v.channel} | ${v.title} | ${v.id} | ${new Date(v.published).toISOString().slice(0, 10)}${p.clips ? ' | 조회수 ' + v.views : ''}${p.cached ? ' | (기록)' : ''}`);
+    }
+  }
+  for (const l of lines) console.log('  ' + l);
+  for (let i = 0; i < lines.length; i += 8) console.log(`::notice title=영상 자동 찾기 결과 (${i + 1}~${Math.min(i + 8, lines.length)})::${ghEsc(lines.slice(i, i + 8).join('\n'))}`);
+
+  let applied = 0;
+  if (write) {
+    mkdirSync(dirname(cachePath), { recursive: true });
+    writeFileSync(cachePath, JSON.stringify(cache, null, 2) + '\n', 'utf8');
+    applied = applyPicks(files, picks);
+  }
+  console.log(
+    `✅ 영상 자동 찾기: 영상 없는 카드 ${cards.length}개 → 붙임 ${picks.size}개 (기록에서 ${stat.cached}개, 새로 찾음 ${stat.found}개), 못 찾음 ${stat.none}개, 기다리는 중 ${stat.waiting}개, 다음으로 미룸 ${stat.postponed}개 · 이번 검색 ${stat.searched}번 (하루 무료 한도 100번)` +
+      (write ? ` · 올릴 파일에 ${applied}곳 붙였어요 (저장소 원본은 그대로예요)` : ' · --write 가 없어서 파일은 바꾸지 않았어요')
+  );
+}
+
 try {
   if (command === 'validate') validate();
   else if (command === 'merge') merge();
@@ -775,8 +1125,9 @@ try {
   else if (command === 'check') checkFile(argv[1]);
   else if (command === 'add') add(argv[1]);
   else if (command === 'verify-media') await verifyMedia();
+  else if (command === 'find-videos') await findVideos();
   else {
-    console.error('사용법: node scripts/content.mjs <validate|merge|recent|check|add|verify-media> [카드목록.json] [--site site]');
+    console.error('사용법: node scripts/content.mjs <validate|merge|recent|check|add|verify-media|find-videos> [카드목록.json] [--site site]');
     process.exit(2);
   }
 } catch (e) {
