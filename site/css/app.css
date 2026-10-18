@@ -175,6 +175,7 @@ a { color: inherit; }
   color: var(--cobalt);
 }
 .mypills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+.mywin { margin: 10px 2px 0; font-size: 13px; line-height: 1.55; color: var(--muted); } /* 지금 보여주는 기간 안내 (고른 분야 수에 따라 달라져요) */
 .pill.g { padding: 6px 12px; font-size: 13px; }
 /* 분야별 목록: 분야마다 제목 + 가장 최근 해설(큰 카드) + 나머지(작은 카드) */
 .sec { margin-top: 30px; }
@@ -193,6 +194,7 @@ a { color: inherit; }
   color: var(--muted);
 }
 .sec .tlist { margin-top: 10px; }
+.morebtn { min-height: 48px; margin-top: 10px; font-size: 14px; } /* '이슈 더 보기' */
 .ctop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dtag { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .dtag.now { padding: 1px 8px; border-radius: 999px; background: var(--lime); color: var(--ink); font-weight: 700; }
@@ -558,6 +560,7 @@ a { color: inherit; }
   box-shadow: 0 8px 0 var(--ground); /* 아래쪽 1픽셀 틈으로 목록이 비치지 않게 (화면 밖으로 나간 부분은 잘려요) */
 }
 .pickhint { margin: 0; text-align: center; font-size: 13px; font-weight: 600; color: var(--muted); }
+.pickwin { display: block; margin-top: 2px; font-weight: 500; }
 
 /* ---------- 알림 ---------- */
 .panel { padding: 12px 18px 18px; background: var(--card); border: 1px solid var(--line); border-radius: 20px; }

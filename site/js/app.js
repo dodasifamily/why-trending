@@ -22,14 +22,18 @@
         return fallback;
       }
     },
-    set(key, value) {
+    /** maxChars 보다 큰 값은 저장하지 않아요 (큰 데이터가 저장 공간을 다 차지해서 내 분야·알림 같은 설정이 저장 안 되는 일을 막아요) */
+    set(key, value, maxChars) {
       try {
-        localStorage.setItem('wt.' + key, JSON.stringify(value));
+        const text = JSON.stringify(value);
+        if (maxChars && text.length > maxChars) return;
+        localStorage.setItem('wt.' + key, text);
       } catch (e) {
         /* 저장할 수 없어도 앱은 계속 동작해요 */
       }
     }
   };
+  const CACHE_MAX_CHARS = 300000; // 받아 둔 해설 파일 하나당 저장 한도. 지난 이슈 보관함(archive.json)처럼 계속 커지는 파일이 이 한도를 넘으면 저장하지 않고, 앱에 들어 있는 사본·인터넷으로 대신해요
 
   // ---------- 상태 ----------
   // 분야 목록(이름·색·아이콘)은 data/categories.json 하나만 기준이에요. 거기서 고치면 앱을 새로 만들지 않아도 바뀌어요.
@@ -48,6 +52,9 @@
     rev: 0, // 지금 받은 분야 목록의 구성 번호 (categories.json 의 revision)
     revNotice: false, // 분야 구성이 새로 바뀐 직후 한 번, 옛 선택을 새 분야로 옮겼다고 알리고 다시 고르게 해요
     recent: null, // 최근 3일 해설 (recent.json)
+    archive: null, // 지난 이슈 보관함 (archive.json). 3일보다 긴 기간을 보여줘야 할 때만 받아 와요
+    archiveState: 'idle', // idle | loading | ok | error
+    shown: {}, // 목록마다 지금까지 펼친 개수 ('더 보기'). 보던 목록으로 돌아와도 같은 길이로 그려요
     dictGroup: 'all', // 검색 화면에서 보고 있는 분야 ('all' = 전체)
     alertOn: store.get('alertOn', false) === true,
     hour: HOURS.includes(store.get('hour', 8)) ? store.get('hour', 8) : 8,
@@ -177,6 +184,11 @@
     const y = parseYmd(b);
     return x && y ? Math.round((y - x) / 86400000) : 0;
   }
+  /** 'YYYY-MM-DD' 날짜에서 n일 뒤(음수면 앞) 날짜 */
+  function addDays(ymd, n) {
+    const m = YMD.exec(ymd || '');
+    return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + n)).toISOString().slice(0, 10) : '';
+  }
 
   // ---------- 데이터 불러오기 ----------
   function getJson(url, ms) {
@@ -201,7 +213,7 @@
     return getJson(first)
       .then((j) => {
         if (!ok(j)) throw new Error('bad data');
-        store.set(cacheKey, j);
+        store.set(cacheKey, j, CACHE_MAX_CHARS);
         return j;
       })
       .catch(() => {
@@ -253,6 +265,7 @@
     ];
     return Promise.all(jobs).then(() => {
       const r = parseRoute().name;
+      if (S.archiveState === 'error') S.archiveState = 'idle'; // 지난 이슈를 못 받았었다면 이번 화면에서 다시 받아 봐요
       if (hadGroups && view.querySelector('.pickrow')) return; // 분야를 고르는 중이에요
       if (r === 'today' || r === 'detail') route(true);
       // 검색 화면은 글자를 치는 중이 아닐 때만 다시 그려요 (치는 도중에 화면이 바뀌지 않게)
@@ -288,12 +301,51 @@
     return termsPromise;
   }
 
+  let archivePromise = null;
+  /**
+   * 지난 이슈 보관함(archive.json)을 한 번만 받아 와요. 분야를 적게 골라서 3일보다 긴 기간을 보여줘야 하거나 글자로 검색할 때만 받아요.
+   * 못 받으면 최근 3일 이슈만 보여주고(오류 안내만 달아요), 다음에 데이터를 새로 받을 때 다시 시도해요.
+   */
+  function loadArchive() {
+    if (archivePromise) return archivePromise;
+    S.archiveState = 'loading';
+    archivePromise = loadFile('archive.json', 'cache.archive', okRecent)
+      .then((j) => {
+        S.archive = j;
+        S.archiveState = 'ok';
+      })
+      .catch(() => {
+        S.archiveState = S.archive ? 'ok' : 'error';
+      })
+      .then(() => {
+        archivePromise = null;
+        archiveArrived();
+      });
+    return archivePromise;
+  }
+  /** 3일보다 긴 기간이 필요한 화면에서 부르면, 보관함을 아직 안 받았을 때만 받기 시작해요 */
+  function wantArchive(days) {
+    if (days > FEED_DAYS && S.archiveState === 'idle') loadArchive();
+  }
+  /** 보관함이 도착(또는 실패)하면 보고 있는 목록을 다시 그려요 (글자를 치는 중이어도 입력칸은 건드리지 않아요) */
+  function archiveArrived() {
+    const r = parseRoute().name;
+    if (r === 'dict') {
+      if (dictRedraw) dictRedraw();
+    } else if (r === 'today' && !view.querySelector('.pickrow')) {
+      route(true);
+    }
+  }
+  let dictRedraw = null; // 가장 최근에 그린 검색 화면의 목록만 다시 그리는 함수 (검색 화면을 보고 있을 때만 불러요)
+
   function findCard(id) {
     const a = S.today && S.today.cards.find((c) => c.id === id);
     if (a) return a;
     const b = S.recent && S.recent.cards.find((c) => c.id === id);
     if (b) return b;
-    return (S.terms && S.terms.terms.find((c) => c.id === id)) || null;
+    const c = S.archive && S.archive.cards.find((x) => x.id === id);
+    if (c) return c;
+    return (S.terms && S.terms.terms.find((x) => x.id === id)) || null;
   }
 
   // ---------- 분야 ----------
@@ -324,6 +376,7 @@
     const order = groupIds();
     S.cats = order.filter((id) => ids.includes(id));
     store.set('cats', S.cats);
+    S.shown = {}; // 보는 분야가 바뀌었으니 '더 보기'로 펼친 길이도 처음부터
     onCatsChanged();
   }
   function onCatsChanged() {
@@ -370,13 +423,25 @@
   }
 
   // ---------- 분야별 목록 ----------
-  // 오늘 기준 2일 전까지(오늘·어제·그저께, 모두 3일)의 이슈만 보여줘요 (2026-10-19 사용자 요청). 분야마다 최신 순으로 최대 FEED_MAX 개.
-  // scripts/content.mjs 의 RECENT_DAYS·FEED_MAX_PER_GROUP 과 같은 값이에요. 이 기간이 지난 해설은 목록·검색 어디에도 나오지 않아요.
-  const FEED_MAX = 7;
+  // 얼마나 오래된 이슈까지 보여줄지는 '고른 분야 수'에 따라 달라져요 (2026-10-19 사용자 요청).
+  //  - 모든 분야를 고르면 오늘 기준 2일 전까지(오늘·어제·그저께, FEED_DAYS = 3일). scripts/content.mjs 의 RECENT_DAYS 와 같은 값이에요.
+  //  - 분야를 적게 고를수록 화면에 보이는 양이 비슷하도록 더 오래전 이슈까지 보여줘요 (분야 수 × 일수가 거의 같아요: 8개 3일 → 4개 6일 → 2개 12일).
+  //  - 딱 1개만 고르면 그 분야의 이슈를 모두 보여줘요.
+  // 3일보다 긴 기간은 지난 이슈 보관함(archive.json)에서 가져와요. 분야마다 FEED_PAGE 개씩 보여주고 '더 보기'로 이어서 펼쳐요.
   const FEED_DAYS = 3;
+  const FEED_PAGE = 20;
 
-  /** 오늘 해설과 최근 해설을 합쳐서 (같은 id 는 오늘 쪽 하나만) 오늘 기준 FEED_DAYS 일 안의 것만, 최신 날짜 순으로 */
-  function feedCards() {
+  /** 보고 있는 분야가 n 개일 때 보여줄 기간(일). 분야를 하나만 보면 Infinity(전부) */
+  function windowDays(n) {
+    const total = S.groups ? S.groups.length : 0;
+    if (!total || n >= total) return FEED_DAYS; // 모든 분야(또는 분야 목록을 못 받은 때)는 기본 기간
+    if (n <= 1) return Infinity;
+    return Math.max(FEED_DAYS, Math.round((FEED_DAYS * total) / n));
+  }
+
+  /** 오늘 해설·최근 해설·지난 이슈 보관함을 합쳐서 (같은 id 는 먼저 온 쪽 하나만) 오늘 기준 days 일 안의 것만, 최신 날짜 순으로 */
+  function feedCards(days) {
+    const d = days === undefined ? FEED_DAYS : days;
     const seen = new Set();
     const out = [];
     const add = (c) => {
@@ -386,19 +451,36 @@
     };
     if (S.today) S.today.cards.forEach(add);
     if (S.recent) S.recent.cards.forEach(add);
-    const base = todayYmd();
-    return out.filter((c) => parseYmd(c.date) && daysApart(c.date, base) < FEED_DAYS).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    if (S.archive && d > FEED_DAYS) S.archive.cards.forEach(add);
+    const from = d === Infinity ? '' : addDays(todayYmd(), -(d - 1));
+    return out.filter((c) => YMD.test(c.date || '') && c.date >= from).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }
 
-  /** 내 분야마다 하나씩. 분야 목록에 없는 분야의 해설은 '기타'로, 분야 목록을 못 받았으면 한 목록으로 */
-  function feedSections() {
-    const all = feedCards();
-    if (!S.groups) return [{ id: '', label: '최근 이슈', cards: all.slice(0, FEED_MAX * 2) }];
+  /** 오늘 화면의 내용: 보여줄 기간(days), 그 기간의 해설 전부(all), 내 분야마다 하나씩(secs). 분야 목록에 없는 분야의 해설은 '기타'로, 분야 목록을 못 받았으면 한 목록으로 */
+  function feedView() {
+    const mine = S.groups ? myCats() : null;
     const ids = groupIds();
-    const secs = (myCats() || ids).map((id) => ({ id, label: groupOf(id).label, cards: all.filter((c) => c.group === id).slice(0, FEED_MAX) }));
-    const other = all.filter((c) => !ids.includes(c.group)).slice(0, FEED_MAX);
+    const days = windowDays(mine ? mine.length : ids.length);
+    const all = feedCards(days);
+    if (!S.groups) return { days, all, secs: [{ id: '', label: '최근 이슈', cards: all }] };
+    const secs = (mine || ids).map((id) => ({ id, label: groupOf(id).label, cards: all.filter((c) => c.group === id) }));
+    const other = all.filter((c) => !ids.includes(c.group));
     if (other.length) secs.push({ id: '', label: '기타', cards: other });
-    return secs;
+    return { days, all, secs };
+  }
+
+  /** 기간을 사람이 읽는 말로: 최근 8일 / 전체 */
+  function spanText(days) {
+    return days === Infinity ? '모든 기간' : `최근 ${days}일`;
+  }
+  /** 내 분야 줄 밑의 한 줄 설명 (n = 고른 분야 수) */
+  function windowNote(days, n) {
+    if (days === Infinity) return '고른 분야가 하나라서 이 분야의 이슈를 모두 보여드려요.';
+    return `${spanText(days)} 이슈를 보여드려요.` + (n > 1 ? ' 분야를 적게 고를수록 더 오래된 이슈까지 보여드려요.' : '');
+  }
+  /** 해당 기간에 이슈가 없을 때의 말 */
+  function noneText(days) {
+    return days === Infinity ? '아직 올라온 이슈가 없어요.' : `${spanText(days)} 동안 올라온 이슈가 아직 없어요.`;
   }
 
   /** 해설 날짜를 짧게: 오늘 / 어제 / 그저께 / 10월 14일 */
@@ -408,7 +490,10 @@
     if (daysApart(s, now) === 1) return '어제';
     if (daysApart(s, now) === 2) return '그저께';
     const d = parseYmd(s);
-    return d ? `${d.getMonth() + 1}월 ${d.getDate()}일` : '';
+    if (!d) return '';
+    // 해가 다른 오래된 해설은 연도도 같이 (예: 2025년 12월 30일)
+    const yr = parseYmd(now);
+    return `${yr && d.getFullYear() !== yr.getFullYear() ? d.getFullYear() + '년 ' : ''}${d.getMonth() + 1}월 ${d.getDate()}일`;
   }
   function dayTag(s) {
     const t = dayText(s);
@@ -529,20 +614,40 @@
     );
   }
 
-  /** 분야 하나: 제목 + 가장 최근 해설은 큰 카드로, 나머지는 작은 카드로 */
-  function sectionNode(sec) {
+  /**
+   * 작은 카드 목록을 FEED_PAGE 개씩 보여주고, 남았으면 '더 보기' 버튼을 달아요. 누르면 화면을 다시 그리지 않고 같은 자리에 이어서 붙어요.
+   * 펼친 개수는 key 별로 기억해서(S.shown), 해설을 열었다가 뒤로 와도 같은 길이로 그려요.
+   */
+  function pagedRows(items, key, makeRow) {
+    if (!items.length) return [];
+    const box = h('div', { class: 'tlist' });
+    const btn = h('button', { class: 'btn ghost morebtn', type: 'button' });
+    let shown = 0;
+    const fill = (upTo) => {
+      const end = Math.min(items.length, upTo);
+      for (; shown < end; shown++) box.appendChild(makeRow(items[shown]));
+      S.shown[key] = shown;
+      const left = items.length - shown;
+      if (left > 0) btn.textContent = `이슈 더 보기 (${left}개 남음)`;
+      else btn.remove();
+    };
+    btn.addEventListener('click', () => fill(shown + FEED_PAGE));
+    fill(Math.max(FEED_PAGE, S.shown[key] || 0));
+    return items.length > shown ? [box, btn] : [box];
+  }
+
+  /** 분야 하나: 제목 + 가장 최근 해설은 큰 카드로, 나머지는 작은 카드로 (days = 보여주는 기간) */
+  function sectionNode(sec, days) {
     const items = sec.cards;
     return h(
       'section',
       { class: 'sec', 'aria-label': sec.label },
       h('div', { class: 'sechead' }, h('h2', { class: 'sech' }, sec.id ? gdot(sec.id) : null, h('span', null, labelNodes(sec.label))), items.length ? h('span', { class: 'secn' }, items.length + '개') : null),
-      items.length
-        ? [cardButton(items[0]), items.length > 1 ? h('div', { class: 'tlist' }, items.slice(1).map((c) => termRow(c, true))) : null]
-        : h('p', { class: 'secnone' }, `최근 ${FEED_DAYS}일 동안 올라온 이슈가 아직 없어요.`)
+      items.length ? [cardButton(items[0]), pagedRows(items.slice(1), 's:' + (sec.id || '_'), (c) => termRow(c, true))] : h('p', { class: 'secnone' }, noneText(days))
     );
   }
 
-  function myCatsRow() {
+  function myCatsRow(days) {
     const mine = myCats();
     if (!mine) return null;
     const all = mine.length === S.groups.length;
@@ -553,7 +658,8 @@
       'div',
       { class: 'mycats' },
       h('div', { class: 'mytop' }, h('span', { class: 'mylabel' }, '내 분야'), h('button', { class: 'linkbtn', type: 'button', 'aria-label': '내 분야 바꾸기', onclick: () => go('/pick') }, '바꾸기')),
-      h('div', { class: 'mypills' }, pills)
+      h('div', { class: 'mypills' }, pills),
+      h('p', { class: 'mywin' }, windowNote(days, mine.length))
     );
   }
 
@@ -573,15 +679,23 @@
       // 분야 목록이 와야 '내 분야'를 걸러낼 수 있어요. 잠깐이라 안내만 보여줘요 (못 받으면 전부 보여줘요)
       nodes.push(h('p', { class: 'note', role: 'status' }, '해설을 불러오고 있어요…'));
     } else {
-      const secs = feedSections();
+      const fv = feedView();
+      wantArchive(fv.days); // 3일보다 긴 기간이면 지난 이슈 보관함을 받아 와요 (도착하면 이 화면을 다시 그려요)
       const late = daysApart(S.today.date, todayYmd()) >= 2;
       if (late) nodes.push(h('p', { class: 'stale', role: 'status' }, '업데이트가 조금 늦어지고 있어요. 새 이슈가 올라오면 바로 보여드릴게요.'));
-      nodes.push(myCatsRow());
-      if (secs.some((s) => s.cards.length)) {
-        secs.forEach((s) => nodes.push(sectionNode(s)));
-      } else if (!feedCards().length) {
-        // 최근 3일 안의 이슈가 하나도 없어요 (갱신이 며칠 멈춘 경우). 오래된 이슈를 대신 보여주지 않아요
-        nodes.push(h('div', { class: 'box' }, h('h2', null, `최근 ${FEED_DAYS}일 이슈가 아직 없어요`), h('p', null, '새 이슈가 올라오면 여기에 바로 보여요. 오래된 이슈는 보여드리지 않아요.')));
+      nodes.push(myCatsRow(fv.days));
+      if (fv.secs.some((s) => s.cards.length)) {
+        fv.secs.forEach((s) => nodes.push(sectionNode(s, fv.days)));
+      } else if (!fv.all.length) {
+        // 보여줄 기간 안의 이슈가 하나도 없어요 (갱신이 며칠 멈춘 경우). 기간 밖의 이슈를 대신 보여주지 않아요
+        nodes.push(
+          h(
+            'div',
+            { class: 'box' },
+            h('h2', null, fv.days === Infinity ? '아직 이슈가 없어요' : `${spanText(fv.days)} 이슈가 아직 없어요`),
+            h('p', null, '새 이슈가 올라오면 여기에 바로 보여요.' + (fv.days <= FEED_DAYS ? ' 분야를 적게 고르면 더 오래된 이슈도 볼 수 있어요.' : ''))
+          )
+        );
       } else {
         nodes.push(
           h(
@@ -593,6 +707,8 @@
           )
         );
       }
+      if (fv.days > FEED_DAYS && S.archiveState === 'loading') nodes.push(h('p', { class: 'note', role: 'status' }, '지난 이슈를 더 불러오고 있어요…'));
+      else if (fv.days > FEED_DAYS && S.archiveState === 'error') nodes.push(h('p', { class: 'note', role: 'status' }, `지난 이슈를 불러오지 못해서 최근 ${FEED_DAYS}일 이슈만 보여드려요. 인터넷 연결을 확인해 주세요.`));
       nodes.push(h('p', { class: 'note' }, AI_NOTE));
     }
     setView(nodes, keepScroll);
@@ -675,7 +791,10 @@
     function sync() {
       const n = chosen.size;
       save.disabled = n === 0;
-      hint.textContent = n === 0 ? '하나 이상 골라 주세요' : n === groups.length ? '모든 분야를 볼게요' : `${n}개 분야를 골랐어요`;
+      hint.textContent = '';
+      append(hint, n === 0 ? '하나 이상 골라 주세요' : n === groups.length ? '모든 분야를 볼게요' : `${n}개 분야를 골랐어요`);
+      // 고른 분야 수에 따라 보여주는 기간이 달라져요 (windowDays)
+      if (n > 0) append(hint, h('span', { class: 'pickwin' }, windowDays(n) === Infinity ? '이 분야의 이슈를 모두 보여드려요' : `${spanText(windowDays(n))} 이슈를 보여드려요`));
       allBtn.textContent = n === groups.length ? '전체 해제' : '전체 선택';
     }
     sync();
@@ -685,7 +804,7 @@
       : [
           h('div', { class: 'topbar' }, h('button', { class: 'back', type: 'button', onclick: leave }, icon('left', 22), '뒤로')),
           h('h1', { class: 'h2big' }, revised ? '분야가 새로 바뀌었어요' : '내 분야'),
-          h('p', { class: 'sub' }, revised ? `포털 뉴스처럼 ${groups.length}개 분야로 정리했어요. 지난번에 고른 분야는 새 분야로 옮겨 뒀어요. 확인하고 저장해 주세요.` : '고른 분야의 이슈만 오늘 화면에 보여드려요.')
+          h('p', { class: 'sub' }, revised ? `포털 뉴스처럼 ${groups.length}개 분야로 정리했어요. 지난번에 고른 분야는 새 분야로 옮겨 뒀어요. 확인하고 저장해 주세요.` : '고른 분야의 이슈만 오늘 화면에 보여드려요. 적게 고를수록 더 오래된 이슈까지 보여드려요.')
         ];
     setView(
       [
@@ -1119,7 +1238,7 @@
       catPill(c),
       h('h1', { class: 'dh1' }, h('span', { class: 'hl' }, c.keyword)),
       h('p', { class: 'dline' }, c.line),
-      // 최근 3일이 지난 해설을 링크로 열었을 때: 목록에는 안 나오지만 링크는 열어 주고, 지난 소식이라고 알려줘요
+      // 3일이 지난 해설(분야를 적게 골라 지난 이슈까지 보거나, 링크·검색으로 연 경우): 열어 주되 지난 소식이라고 알려줘요
       daysApart(c.date, todayYmd()) >= FEED_DAYS ? h('p', { class: 'stale', role: 'status' }, `${daysApart(c.date, todayYmd())}일 전 소식이에요. 지금은 내용이 달라졌을 수 있어요.`) : null,
       mediaBlock(c),
       section(c.group === 'meme' ? '뜻' : '무슨 일이에요?', h('p', null, c.meaning)),
@@ -1135,18 +1254,26 @@
     view.setAttribute('data-card-id', c.id);
   }
 
-  // ---------- 검색 (최근 3일 이슈) ----------
-  // 오늘 기준 2일 전까지의 이슈를 한곳에 모아 두고, 분야로 걸러 보거나 글자로 찾아요. 그보다 오래된 해설은 여기에도 나오지 않아요.
+  // ---------- 검색 ----------
+  // 분야를 걸러 보거나 글자로 찾아요. 기간은 첫 화면과 같은 규칙이에요: 전체(모든 분야)는 최근 3일, 분야를 하나 고르면 그 분야의 모든 이슈.
+  // 글자를 치면 기간과 상관없이 보관함에 있는 이슈를 모두 찾아요 (오래된 이슈도 아예 못 찾게 되지는 않게).
   function matchTerm(c, needle) {
     if (!needle) return true;
     return [c.keyword, c.line, c.cat, c.meaning].some((t) => String(t).toLowerCase().includes(needle));
   }
 
+  /** 검색 화면에서 보여줄 기간. 글자를 치면 전부, 분야 하나를 고르면 그 분야 전부(분야 1개와 같아요), 전체는 모든 분야를 고른 것과 같아요 */
+  function searchDays(needle, only) {
+    if (needle) return Infinity;
+    return windowDays(only !== 'all' ? 1 : groupIds().length);
+  }
+
   function renderDict() {
     document.title = '검색 – 왜이슈?';
 
-    const list = h('div', { class: 'tlist' });
+    const listHost = h('div');
     const empty = h('p', { class: 'note', role: 'status' });
+    const sub = h('p', { class: 'sub' });
     const input = h('input', {
       id: 'termq',
       type: 'search',
@@ -1157,24 +1284,36 @@
       spellcheck: 'false',
       oninput: (e) => {
         S.q = e.target.value;
+        S.shown.q = 0; // 찾는 말이 바뀌면 '더 보기'도 처음부터
         drawList();
       }
     });
     input.value = S.q;
 
     function drawList() {
-      list.textContent = '';
+      listHost.textContent = '';
       empty.textContent = '';
+      const needle = S.q.trim().toLowerCase();
+      const only = S.groups && S.dictGroup !== 'all' && groupIds().includes(S.dictGroup) ? S.dictGroup : 'all';
+      const days = searchDays(needle, only);
+      sub.textContent = needle
+        ? '지난 이슈까지 모두 찾아봐요'
+        : only !== 'all'
+          ? `${groupOf(only).label} 분야의 이슈를 모두 모아뒀어요`
+          : `${spanText(days)} 이슈를 모아뒀어요. 분야를 누르면 그 분야의 이슈를 모두 볼 수 있어요`;
       if (!S.today && !S.recent) {
         empty.textContent = S.todayState === 'error' ? '이슈를 불러오지 못했어요. 인터넷 연결을 확인하고 다시 들어와 주세요.' : '이슈를 불러오고 있어요…';
         return;
       }
-      const needle = S.q.trim().toLowerCase();
-      const only = S.groups && S.dictGroup !== 'all' && groupIds().includes(S.dictGroup) ? S.dictGroup : 'all';
-      const hits = feedCards().filter((c) => (only === 'all' || c.group === only) && matchTerm(c, needle));
-      hits.forEach((c) => list.appendChild(termRow(c, true, true)));
-      if (!hits.length) empty.textContent = needle ? '검색 결과가 없어요. 다른 말로 찾아보세요.' : only !== 'all' ? `이 분야는 최근 ${FEED_DAYS}일 동안 올라온 이슈가 없어요.` : `최근 ${FEED_DAYS}일 동안 올라온 이슈가 아직 없어요.`;
+      wantArchive(days); // 3일보다 긴 기간이면 지난 이슈 보관함을 받아 와요 (도착하면 이 목록만 다시 그려요)
+      const hits = feedCards(days).filter((c) => (only === 'all' || c.group === only) && matchTerm(c, needle));
+      append(listHost, pagedRows(hits, 'q', (c) => termRow(c, true, true)));
+      const waiting = days > FEED_DAYS && S.archiveState === 'loading';
+      if (waiting) empty.textContent = '지난 이슈를 불러오고 있어요…';
+      else if (!hits.length) empty.textContent = needle ? '검색 결과가 없어요. 다른 말로 찾아보세요.' : only !== 'all' ? '이 분야는 아직 올라온 이슈가 없어요.' : noneText(days);
+      if (days > FEED_DAYS && S.archiveState === 'error') empty.textContent = (empty.textContent ? empty.textContent + ' ' : '') + `지난 이슈를 불러오지 못해서 최근 ${FEED_DAYS}일 이슈만 찾았어요. 인터넷 연결을 확인해 주세요.`;
     }
+    dictRedraw = drawList;
 
     const filterBtns = S.groups
       ? [{ id: 'all', label: '전체' }, ...S.groups].map((g) =>
@@ -1187,6 +1326,7 @@
               'aria-pressed': S.dictGroup === g.id ? 'true' : 'false',
               onclick: () => {
                 S.dictGroup = g.id;
+                S.shown.q = 0; // 보는 분야가 바뀌면 '더 보기'도 처음부터
                 filterBtns.forEach((b) => b.setAttribute('aria-pressed', b.getAttribute('data-group') === g.id ? 'true' : 'false'));
                 drawList();
               }
@@ -1198,11 +1338,11 @@
 
     setView([
       h('h1', { class: 'h2big' }, '검색'),
-      h('p', { class: 'sub' }, `최근 ${FEED_DAYS}일 동안 올라온 이슈를 모아뒀어요`),
+      sub,
       h('label', { for: 'termq', style: 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap' }, '이슈 검색'),
       h('div', { class: 'field' }, icon('search', 20), input),
       filterBtns.length ? h('div', { class: 'fchips', role: 'group', 'aria-label': '분야로 걸러 보기' }, filterBtns) : null,
-      list,
+      listHost,
       empty
     ]);
     drawList();
