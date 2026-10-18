@@ -11,6 +11,11 @@ on:
       - 'scripts/content.mjs'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
+    inputs:
+      retry_videos:
+        description: '영상을 못 찾았던 카드도 6시간을 기다리지 않고 바로 다시 찾아요 (유튜브 검색 한도를 써요)'
+        type: boolean
+        default: false
   # 매일 한국 시간 06:30 (해설 갱신 40분 뒤)에 한 번 더 올려요. 갱신 때 올리기를 놓쳤거나,
   # Pages 를 나중에 켠 경우에도 하루 안에 저절로 사이트가 올라가요.
   schedule:
@@ -62,6 +67,7 @@ jobs:
         continue-on-error: true
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          FIND_VIDEOS_RETRY: ${{ inputs.retry_videos && '1' || '' }}
         run: node scripts/content.mjs find-videos --write
 
       - name: 영상 찾기 기록 저장

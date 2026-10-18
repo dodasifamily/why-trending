@@ -984,15 +984,25 @@ async function searchPick(card, mode, key, stat) {
   const details = d.body && Array.isArray(d.body.items) ? d.body.items : [];
   const passed = [];
   const why = {};
+  const near = []; // 허용 채널 문제 말고 다른 이유로 떨어진 가까운 후보 (왜 못 찾았는지 보려고 메모에 남겨요)
+  const foreign = {}; // 허용 목록에 없어서 떨어진 채널
   for (const it of details) {
     const r = evaluateVideo(it, card, mode);
-    if (r.v) passed.push(r.v);
-    else why[r.why] = (why[r.why] || 0) + 1;
+    if (r.v) {
+      passed.push(r.v);
+      continue;
+    }
+    why[r.why] = (why[r.why] || 0) + 1;
+    const sn = (it && it.snippet) || {};
+    const ch = htmlDecode(sn.channelTitle).trim();
+    if (r.why === '허용 채널 아님') foreign[ch] = (foreign[ch] || 0) + 1;
+    else if (ch && near.length < 3) near.push(`${ch} | ${htmlDecode(sn.title).trim().slice(0, 60)} → ${r.why}`);
   }
   const chosen = chooseVideos(passed, mode);
   if (!chosen) {
     const top = Object.entries(why).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${k} ${n}`).join(', ');
-    return { pick: null, why: `후보 ${details.length}개가 모두 안 맞았어요 (${top || '이유 없음'})` };
+    const chans = Object.entries(foreign).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k.slice(0, 30)} ${n}`).join(', ');
+    return { pick: null, why: `후보 ${details.length}개가 모두 안 맞았어요 (${top || '이유 없음'})`, near, chans };
   }
   const problems = pickProblems(card, chosen);
   if (problems.length) return { pick: null, why: `카드 검사에 걸렸어요: ${problems[0]}` };
@@ -1019,6 +1029,7 @@ function applyPicks(files, picks) {
 
 async function findVideos() {
   const write = argv.includes('--write');
+  const retry = argv.includes('--retry') || process.env.FIND_VIDEOS_RETRY === '1'; // 못 찾았던 카드도 6시간을 기다리지 않고 바로 다시 찾아요
   const key = String(process.env.YOUTUBE_API_KEY || '').trim();
   if (!key) {
     console.log('::notice title=영상 자동 찾기를 건너뛰었어요::YOUTUBE_API_KEY 가 없어요. 저장소 Settings → Secrets and variables → Actions 에 유튜브 검색 키를 YOUTUBE_API_KEY 라는 이름으로 넣으면 켜져요');
@@ -1043,6 +1054,7 @@ async function findVideos() {
 
   const picks = new Map(); // 카드 id -> { media | clips, info, cached }
   const stat = { cached: 0, searched: 0, found: 0, none: 0, waiting: 0, postponed: 0 };
+  const misses = []; // 못 찾은 카드와 이유 (실행 화면 메모용)
   let stopped = '';
   const deadline = Date.now() + 4 * 60 * 1000; // 인터넷이 느려도 이 단계가 오래 붙잡지 않게
   for (const card of cards) {
@@ -1055,8 +1067,10 @@ async function findVideos() {
         stat.cached++;
         continue;
       }
-      if (!hit.pick && (now - Date.parse(hit.searchedAt)) / 3600000 < FIND_RETRY_HOURS) {
+      // 이유(why)가 적혀 있지 않은 예전 기록은 기다리지 않고 다시 찾아요
+      if (!hit.pick && hit.why && !retry && (now - Date.parse(hit.searchedAt)) / 3600000 < FIND_RETRY_HOURS) {
         stat.waiting++;
+        misses.push({ id: card.id, keyword: card.keyword, why: hit.why, near: Array.isArray(hit.near) ? hit.near : [], chans: hit.chans || '', old: `${Math.max(0, Math.round((now - Date.parse(hit.searchedAt)) / 3600000))}시간 전` });
         continue;
       }
     }
@@ -1066,9 +1080,11 @@ async function findVideos() {
     }
     const mode = CLIP_GROUPS.includes(card.group) ? 'clips' : 'news';
     if (mode === 'clips' && textKey(card.keyword).length < FIND_CLIP_MIN_KEYWORD) {
-      cache.cards[card.id] = { sig, searchedAt: nowIso, pick: null };
+      const short = `키워드가 짧아서(${FIND_CLIP_MIN_KEYWORD}글자 미만) 자동으로 찾지 않아요`;
+      cache.cards[card.id] = { sig, searchedAt: nowIso, pick: null, why: short };
       stat.none++;
-      console.log(`  ${card.id} (${card.keyword}): 키워드가 짧아서(${FIND_CLIP_MIN_KEYWORD}글자 미만) 자동으로 찾지 않아요`);
+      misses.push({ id: card.id, keyword: card.keyword, why: short, near: [], chans: '', old: '' });
+      console.log(`  ${card.id} (${card.keyword}): ${short}`);
       continue;
     }
     const r = await searchPick(card, mode, key, stat);
@@ -1083,8 +1099,9 @@ async function findVideos() {
       picks.set(card.id, { ...r.pick.pick, info: r.pick.info });
       stat.found++;
     } else {
-      cache.cards[card.id] = { sig, searchedAt: nowIso, pick: null };
+      cache.cards[card.id] = { sig, searchedAt: nowIso, pick: null, why: r.why, near: r.near || [], chans: r.chans || '' };
       stat.none++;
+      misses.push({ id: card.id, keyword: card.keyword, why: r.why, near: r.near || [], chans: r.chans || '', old: '' });
       console.log(`  ${card.id} (${card.keyword}): 맞는 영상을 못 찾았어요 — ${r.why}`);
     }
     await sleep(200);
@@ -1112,10 +1129,22 @@ async function findVideos() {
     writeFileSync(cachePath, JSON.stringify(cache, null, 2) + '\n', 'utf8');
     applied = applyPicks(files, picks);
   }
-  console.log(
-    `✅ 영상 자동 찾기: 영상 없는 카드 ${cards.length}개 → 붙임 ${picks.size}개 (기록에서 ${stat.cached}개, 새로 찾음 ${stat.found}개), 못 찾음 ${stat.none}개, 기다리는 중 ${stat.waiting}개, 다음으로 미룸 ${stat.postponed}개 · 이번 검색 ${stat.searched}번 (하루 무료 한도 100번)` +
-      (write ? ` · 올릴 파일에 ${applied}곳 붙였어요 (저장소 원본은 그대로예요)` : ' · --write 가 없어서 파일은 바꾸지 않았어요')
-  );
+  const summary =
+    `영상 없는 카드 ${cards.length}개 → 붙임 ${picks.size}개 (기록에서 ${stat.cached}개, 새로 찾음 ${stat.found}개), 못 찾음 ${stat.none}개, 기다리는 중 ${stat.waiting}개, 다음으로 미룸 ${stat.postponed}개 · 이번 검색 ${stat.searched}번 (하루 무료 한도 100번)` +
+    (write ? ` · 올릴 파일에 ${applied}곳 붙였어요 (저장소 원본은 그대로예요)` : ' · --write 가 없어서 파일은 바꾸지 않았어요');
+  console.log(`✅ 영상 자동 찾기: ${summary}`);
+
+  // 실행 화면의 '메모'로도 남겨요 (로그 전체를 못 열어도 왜 못 찾았는지 볼 수 있게)
+  const report = [summary];
+  for (const m of misses) {
+    report.push(`${m.id} (${m.keyword}): ${m.why}${m.old ? ` [${m.old} 찾아봤어요]` : ''}`);
+    if (m.chans) report.push(`   · 허용 목록에 없는 채널: ${m.chans}`);
+    for (const x of m.near) report.push(`   · 가까웠던 후보: ${x}`);
+  }
+  const PER_NOTICE = 14;
+  for (let i = 0, n = 0; i < report.length && n < 4; i += PER_NOTICE, n++) {
+    console.log(`::notice title=영상 자동 찾기 요약 (${i + 1}~${Math.min(i + PER_NOTICE, report.length)}/${report.length})::${ghEsc(report.slice(i, i + PER_NOTICE).join('\n'))}`);
+  }
 }
 
 try {
