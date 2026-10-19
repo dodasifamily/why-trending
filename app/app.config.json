@@ -1,5 +1,5 @@
 {
-  "versionName": "0.4.1",
+  "versionName": "0.4.2",
   "admob": {
     "appId": "ca-app-pub-3940256099942544~3347511713",
     "note": "위 값은 구글이 공개한 테스트용 앱 ID예요. 출시 전에 AdMob 에서 만든 실제 앱 ID 로 바꿔요. (site/js/config.js 의 배너 광고 ID 도 함께 바꿔요)"

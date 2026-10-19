@@ -267,7 +267,7 @@
       const r = parseRoute().name;
       if (S.archiveState === 'error') S.archiveState = 'idle'; // 지난 이슈를 못 받았었다면 이번 화면에서 다시 받아 봐요
       if (hadGroups && view.querySelector('.pickrow')) return; // 분야를 고르는 중이에요
-      if (r === 'today' || r === 'detail') route(true);
+      if (r === 'today' || r === 'detail' || r === 'group') route(true);
       // 검색 화면은 글자를 치는 중이 아닐 때만 다시 그려요 (치는 도중에 화면이 바뀌지 않게)
       else if (r === 'dict') {
         if (!isTypingQuery()) route(true);
@@ -332,7 +332,7 @@
     const r = parseRoute().name;
     if (r === 'dict') {
       if (dictRedraw) dictRedraw();
-    } else if (r === 'today' && !view.querySelector('.pickrow')) {
+    } else if ((r === 'today' || r === 'group') && !view.querySelector('.pickrow')) {
       route(true);
     }
   }
@@ -501,9 +501,19 @@
   }
 
   // ---------- 길 찾기(라우터) ----------
+  // #/ 오늘 · #/t/<해설> 해설 · #/g/<분야> 그 분야의 지난 이슈까지 전부 · #/dict 검색 · #/alerts 알림 · #/pick 내 분야 고르기
+  /** 주소에 든 %XX 를 글자로 되돌려요. 깨진 주소여도 오류 없이 빈 글자가 돼요 */
+  function safeDecode(s) {
+    try {
+      return decodeURIComponent(s);
+    } catch (e) {
+      return '';
+    }
+  }
   function parseRoute() {
     const parts = (location.hash || '#/').replace(/^#/, '').split('/').filter(Boolean);
     if (parts[0] === 't' && parts[1]) return { name: 'detail', id: decodeURIComponent(parts[1]) };
+    if (parts[0] === 'g' && parts[1]) return { name: 'group', id: safeDecode(parts[1]) };
     if (parts[0] === 'dict') return { name: 'dict' };
     if (parts[0] === 'alerts') return { name: 'alerts' };
     if (parts[0] === 'pick') return { name: 'pick' };
@@ -522,7 +532,7 @@
   }
 
   function updateTabs(r) {
-    const active = r.name === 'detail' || r.name === 'pick' ? 'today' : r.name;
+    const active = r.name === 'detail' || r.name === 'pick' || r.name === 'group' ? 'today' : r.name;
     document.querySelectorAll('.tab').forEach((b) => {
       if (b.dataset.tab === active) b.setAttribute('aria-current', 'page');
       else b.removeAttribute('aria-current');
@@ -530,18 +540,19 @@
   }
 
   // ---------- 보던 자리 기억하기 ----------
-  // 오늘·검색 목록에서 해설을 열었다가 뒤로 오면, 떠나기 전에 보던 자리로 돌아와요.
-  // 해설을 열기 직전의 스크롤 위치를 화면 이름별로 기억해 두었다가, 그 화면으로 돌아올 때 되돌려요.
+  // 오늘·검색·분야 전체 보기 목록에서 해설(또는 분야 전체 보기)을 열었다가 뒤로 오면, 떠나기 전에 보던 자리로 돌아와요.
+  // 안쪽 화면(해설, 분야 전체 보기)을 열기 직전의 스크롤 위치를 화면 이름별로 기억해 두었다가, 그 화면으로 돌아올 때 되돌려요.
   // 다른 탭으로 가거나 이미 보고 있는 탭을 다시 누르는 건 새로 시작이라 맨 위에서 보여줘요.
-  const savedScroll = {}; // 화면 이름 → 해설을 열기 직전의 스크롤 위치
-  let shownName = ''; // 지금 화면에 그려져 있는 화면 이름 (today | detail | dict | alerts | pick)
-  let detailFrom = ''; // 지금 열려 있는 해설을 연 화면
+  const savedScroll = {}; // 화면 이름 → 안쪽 화면을 열기 직전의 스크롤 위치
+  let shownName = ''; // 지금 화면에 그려져 있는 화면 이름 (today | detail | group | dict | alerts | pick)
+  const INNER = ['detail', 'group']; // 목록에서 눌러 들어가는 안쪽 화면
+  const openedFrom = {}; // 안쪽 화면 이름 → 그 화면을 연 화면 (today | dict | group)
 
-  function restoreScroll(y) {
+  function restoreScroll(y, name) {
     view.scrollTop = y;
     // 글꼴 등이 늦게 자리를 잡아 높이가 바뀌어도 한 번 더 맞춰요 (그 사이 다른 화면으로 가지는 않았을 때만)
     requestAnimationFrame(() => {
-      if (shownName !== 'detail' && Math.abs(view.scrollTop - y) > 1) view.scrollTop = y;
+      if (shownName === name && Math.abs(view.scrollTop - y) > 1) view.scrollTop = y;
     });
   }
 
@@ -550,17 +561,18 @@
     updateTabs(r);
     let restoreTo = 0;
     if (!keepScroll) {
-      if (r.name === 'detail' && shownName && shownName !== 'detail') {
-        // 목록에서 해설로 들어가요. 아직 이전 화면이 그대로 있어서 지금 보던 자리를 읽을 수 있어요
-        savedScroll[shownName] = view.scrollTop;
-        detailFrom = shownName;
-      } else if (r.name !== 'detail' && shownName === 'detail' && r.name === detailFrom) {
-        // 해설을 열었던 화면으로 돌아와요
+      if (INNER.includes(shownName) && r.name === openedFrom[shownName]) {
+        // 안쪽 화면(해설·분야 전체 보기)을 열었던 화면으로 돌아와요
         restoreTo = savedScroll[r.name] || 0;
+      } else if (INNER.includes(r.name) && shownName && shownName !== r.name) {
+        // 목록에서 안쪽 화면으로 들어가요. 아직 이전 화면이 그대로 있어서 지금 보던 자리를 읽을 수 있어요
+        savedScroll[shownName] = view.scrollTop;
+        openedFrom[r.name] = shownName;
       }
     }
     if (r.name === 'today') renderToday(keepScroll);
     else if (r.name === 'detail') renderDetail(r.id, keepScroll);
+    else if (r.name === 'group') renderGroup(r.id, keepScroll);
     else if (r.name === 'dict') renderDict();
     else if (r.name === 'pick') renderPicker(false);
     else renderAlerts();
@@ -571,7 +583,7 @@
       } catch (e) {
         /* 무시 */
       }
-      if (restoreTo > 0) restoreScroll(restoreTo);
+      if (restoreTo > 0) restoreScroll(restoreTo, r.name);
     }
   }
 
@@ -636,13 +648,34 @@
     return items.length > shown ? [box, btn] : [box];
   }
 
-  /** 분야 하나: 제목 + 가장 최근 해설은 큰 카드로, 나머지는 작은 카드로 (days = 보여주는 기간) */
+  /** 그 분야의 이슈를 지난 것까지 전부 보여주는 화면으로 가요 (2026-10-19 사용자 요청) */
+  function openGroup(id) {
+    go('/g/' + encodeURIComponent(id));
+  }
+
+  /**
+   * 분야 하나: 제목 + 가장 최근 해설은 큰 카드로, 나머지는 작은 카드로 (days = 보여주는 기간).
+   * 제목 줄을 누르면 그 분야의 지난 이슈까지 전부 보여주는 화면으로 가요. (분야 목록에 없는 '기타'는 누를 수 없어요)
+   */
   function sectionNode(sec, days) {
     const items = sec.cards;
+    const count = items.length ? h('span', { class: 'secn' }, items.length + '개') : null;
+    const head = sec.id
+      ? h(
+          'h2',
+          { class: 'sech' },
+          h(
+            'button',
+            { class: 'sechbtn', type: 'button', 'aria-label': `${sec.label} 이슈 전체 보기`, onclick: () => openGroup(sec.id) },
+            h('span', { class: 'sechl' }, gdot(sec.id), h('span', null, labelNodes(sec.label)), count),
+            h('span', { class: 'secgo' }, '전체 보기', icon('right', 14))
+          )
+        )
+      : h('h2', { class: 'sech' }, h('span', null, labelNodes(sec.label)));
     return h(
       'section',
       { class: 'sec', 'aria-label': sec.label },
-      h('div', { class: 'sechead' }, h('h2', { class: 'sech' }, sec.id ? gdot(sec.id) : null, h('span', null, labelNodes(sec.label))), items.length ? h('span', { class: 'secn' }, items.length + '개') : null),
+      h('div', { class: 'sechead' }, head, sec.id ? null : count),
       items.length ? [cardButton(items[0]), pagedRows(items.slice(1), 's:' + (sec.id || '_'), (c) => termRow(c, true))] : h('p', { class: 'secnone' }, noneText(days))
     );
   }
@@ -651,9 +684,10 @@
     const mine = myCats();
     if (!mine) return null;
     const all = mine.length === S.groups.length;
+    // 분야를 눌러 그 분야의 이슈를 지난 것까지 전부 볼 수 있어요 ('모든 분야'는 하나의 분야가 아니라서 누를 수 없어요)
     const pills = all
       ? [h('span', { class: 'pill g' }, '모든 분야')]
-      : mine.map((id) => h('span', { class: 'pill g' }, gdot(id), labelNodes(groupOf(id).label)));
+      : mine.map((id) => h('button', { class: 'pill g plink', type: 'button', 'aria-label': `${groupOf(id).label} 이슈 전체 보기`, onclick: () => openGroup(id) }, gdot(id), labelNodes(groupOf(id).label)));
     return h(
       'div',
       { class: 'mycats' },
@@ -711,6 +745,52 @@
       else if (fv.days > FEED_DAYS && S.archiveState === 'error') nodes.push(h('p', { class: 'note', role: 'status' }, `지난 이슈를 불러오지 못해서 최근 ${FEED_DAYS}일 이슈만 보여드려요. 인터넷 연결을 확인해 주세요.`));
       nodes.push(h('p', { class: 'note' }, AI_NOTE));
     }
+    setView(nodes, keepScroll);
+  }
+
+  // ---------- 분야 전체 보기 ----------
+  // 오늘 화면에서 분야 이름(또는 '내 분야' 줄의 분야)을 누르면 와요 (2026-10-19 사용자 요청).
+  // 고른 분야 수와 상관없이 그 분야의 이슈를 지난 것까지 모두, 최신 날짜 순으로 보여줘요.
+  // 3일보다 오래된 이슈는 지난 이슈 보관함(archive.json)에서 받아 와요. FEED_PAGE 개씩 보여주고 '이슈 더 보기'로 이어서 펼쳐요.
+  function renderGroup(id, keepScroll) {
+    const top = h('div', { class: 'topbar' }, h('button', { class: 'back', type: 'button', onclick: backToList }, icon('left', 22), '뒤로'));
+    if (!S.groups) {
+      // 분야 목록이 와야 어떤 분야인지 알 수 있어요
+      document.title = '왜이슈?';
+      setView([top, S.groupsState === 'error' ? errorBox('분야 목록을 불러오지 못했어요', '인터넷 연결을 확인하고 다시 시도해 주세요.', () => refreshData(true)) : h('p', { class: 'note', role: 'status' }, '분야 목록을 불러오고 있어요…')], keepScroll);
+      return;
+    }
+    if (!groupIds().includes(id)) {
+      document.title = '왜이슈?';
+      setView([top, h('div', { class: 'box' }, h('h2', null, '분야를 찾지 못했어요'), h('p', null, '없어졌거나 이름이 바뀐 분야예요.'), h('button', { class: 'btn primary', type: 'button', onclick: () => go('/', true) }, '오늘 화면으로'))], keepScroll);
+      return;
+    }
+    const g = groupOf(id);
+    document.title = `${g.label} – 왜이슈?`;
+    const nodes = [top, h('h1', { class: 'h2big gtitle' }, gdot(id), h('span', null, labelNodes(g.label)))];
+    if (!S.today && !S.recent) {
+      // 아직 이슈를 하나도 못 받았어요 ('이슈가 없다'고 잘못 알리지 않게 기다리거나 다시 시도하게 해요)
+      nodes.push(S.todayState === 'error' ? errorBox('이슈를 불러오지 못했어요', '인터넷 연결을 확인하고 다시 시도해 주세요.', () => refreshData(true)) : h('p', { class: 'note', role: 'status' }, '이슈를 불러오고 있어요…'));
+      setView(nodes, keepScroll);
+      return;
+    }
+    wantArchive(Infinity); // 지난 이슈 보관함을 아직 안 받았으면 받아 와요 (도착하거나 실패하면 이 화면을 다시 그려요)
+    const items = feedCards(Infinity).filter((c) => c.group === id);
+    const loading = S.archiveState === 'loading';
+    const failed = S.archiveState === 'error';
+    if (loading) nodes.push(h('p', { class: 'sub', role: 'status' }, '지난 이슈까지 불러오고 있어요…'));
+    else if (failed) nodes.push(h('p', { class: 'sub' }, `최근 ${FEED_DAYS}일 이슈만 보여드려요.`));
+    else if (items.length) nodes.push(h('p', { class: 'sub' }, `지난 이슈까지 모두 ${items.length}개예요.`));
+    if (failed) {
+      nodes.push(
+        errorBox('지난 이슈를 불러오지 못했어요', '인터넷 연결을 확인하고 다시 시도해 주세요.', () => {
+          S.archiveState = 'idle';
+          route(true);
+        })
+      );
+    }
+    if (items.length) nodes.push(pagedRows(items, 'g:' + id, (c) => termRow(c, true)));
+    else if (!loading && !failed) nodes.push(h('p', { class: 'secnone' }, '이 분야는 아직 올라온 이슈가 없어요.'));
     setView(nodes, keepScroll);
   }
 
@@ -1203,7 +1283,7 @@
 
   let navigatedInApp = false; // 앱 안에서 화면을 한 번이라도 앞으로 넘겼는지
   function backToList() {
-    // 해설을 연 화면(오늘/검색)으로 돌아가요. 링크로 바로 들어왔다면 오늘 화면으로 가요.
+    // 해설·분야 전체 보기를 연 화면(오늘/검색/분야 전체 보기)으로 돌아가요. 링크로 바로 들어왔다면 오늘 화면으로 가요.
     if (navigatedInApp) history.back();
     else go('/', true);
   }
@@ -1638,7 +1718,7 @@
     if (App && App.addListener) {
       App.addListener('backButton', () => {
         const r = parseRoute();
-        if (r.name === 'detail' || r.name === 'pick') backToList();
+        if (r.name === 'detail' || r.name === 'pick' || r.name === 'group') backToList();
         else if (r.name !== 'today') go('/', true);
         else if (App.exitApp) App.exitApp();
       });

@@ -177,13 +177,35 @@ a { color: inherit; }
 .mypills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
 .mywin { margin: 10px 2px 0; font-size: 13px; line-height: 1.55; color: var(--muted); } /* 지금 보여주는 기간 안내 (고른 분야 수에 따라 달라져요) */
 .pill.g { padding: 6px 12px; font-size: 13px; }
+/* '내 분야' 줄의 분야: 누르면 그 분야의 이슈를 지난 것까지 전부 보여줘요 */
+.pill.plink { display: inline-flex; align-items: center; min-height: 40px; padding: 6px 14px; border: none; line-height: 1.5; }
 /* 분야별 목록: 분야마다 제목 + 가장 최근 해설(큰 카드) + 나머지(작은 카드) */
 .sec { margin-top: 30px; }
 .mycats + .sec { margin-top: 20px; }
 .sechead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 2px 10px; }
-.sech { display: flex; align-items: center; margin: 0; font-size: 19px; font-weight: 700; line-height: 1.4; color: var(--ink); }
+.sech { display: flex; flex: 1; min-width: 0; align-items: center; margin: 0; font-size: 19px; font-weight: 700; line-height: 1.4; color: var(--ink); }
 .sech .gdot { width: 10px; height: 10px; margin: 0 8px 0 0; vertical-align: 0; }
 .secn { flex: none; font-size: 13px; font-weight: 600; color: var(--muted); }
+/* 분야 제목 줄 전체가 하나의 버튼이에요. 누르면 그 분야의 이슈를 지난 것까지 전부 보여주는 화면으로 가요 (눌리는 자리를 넓히려고 위아래를 음수 여백으로 맞춰요) */
+.sechbtn {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  min-height: 44px;
+  margin: -8px 0;
+  padding: 6px 0;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.sechl { display: flex; align-items: center; min-width: 0; }
+.sechl .secn { margin-left: 8px; }
+.secgo { flex: none; display: inline-flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 700; color: var(--cobalt); }
 .secnone {
   margin: 0;
   padding: 14px 16px;
@@ -195,6 +217,10 @@ a { color: inherit; }
 }
 .sec .tlist { margin-top: 10px; }
 .morebtn { min-height: 48px; margin-top: 10px; font-size: 14px; } /* '이슈 더 보기' */
+/* 분야 전체 보기 화면의 제목 (분야 색 점 + 분야 이름) */
+.gtitle { display: flex; align-items: center; }
+.gtitle .gdot { width: 14px; height: 14px; margin: 0 10px 0 0; vertical-align: 0; }
+.gtitle + .secnone, .gtitle + .box { margin-top: 18px; }
 .ctop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dtag { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .dtag.now { padding: 1px 8px; border-radius: 999px; background: var(--lime); color: var(--ink); font-weight: 700; }
