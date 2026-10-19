@@ -120,9 +120,12 @@ const NEWS_CHANNEL_KEYS = new Set(NEWS_CHANNELS.map(normName));
 // 2026-10-19 '화제 이슈 중심' 개편: 큰 시위·집회·파업(국내외)은 사실만 전하는 조건으로 다루기로 해서 '시위'·'집회'·'파업'은 뺐어요.
 // 시위 기사에 으레 나오는 '경찰'·'체포'와, 해외 정상을 가리키는 '대통령'도 뺐어요(수사·재판·혐의 같은 말은 그대로 걸러요).
 // 정당·정치인 공방, 범죄·사건사고·사망, 전쟁·테러·북한 군사 소식은 그대로 다루지 않아요.
+// 2026-10-19(사용자 결정: 프로젝트가 오래 가도록 리스크가 적은 주제부터 조금 열기 — 1단계): 국회·정부가 이미 내린 결정·시행 사실은
+// cat '정책' 카드로 다루기로 해서 '국회'를 뺐어요. '의원'·'정당'·'여당'·'야당'·'선거' 같은 정치인·정당·선거 단서는 그대로 걸러요
+// (출처 기사 제목에도 적용돼서, 이런 말이 든 제목의 기사는 출처로 쓰지 않아요).
 const BLOCKED_WORDS = [
-  // 정치·선거 (2026-10-19: 해외 정상 이름 등 사실 설명을 위해 '대통령' 제외)
-  '국회', '의원', '정당', '여당', '야당', '탄핵', '선거', '총선', '대선', '민주당', '국민의힘', '정부 비판',
+  // 정치·선거 (2026-10-19: 해외 정상 이름 등 사실 설명을 위해 '대통령' 제외, 국회·정부 결정 사실을 위해 '국회' 제외)
+  '의원', '정당', '여당', '야당', '탄핵', '선거', '총선', '대선', '민주당', '국민의힘', '정부 비판',
   // 수사·재판·사건사고
   '검찰', '수사', '재판', '기소', '구속', '영장', '혐의', '판결', '실형', '고소', '고발',
   '사망', '숨져', '숨진', '별세', '부고', '자살', '극단적 선택', '살인', '폭행', '성폭행', '성추행', '성범죄', '마약',
@@ -139,6 +142,16 @@ const TONE_WORDS = {
   '자극적인 표현': ['충격', '경악', '발칵', '폭로', '멘붕', '아수라장'],
   '투자 권유로 읽힐 수 있는 표현': ['수혜주', '관련주', '테마주', '목표주가', '목표가', '투자의견', '추천주', '종목 추천', '매수 추천', '매도 추천', '매수 의견']
 };
+
+// 정책 카드 = 국회·정부가 '이미 내린 결정·시행 사실'을 다루는 카드 (2026-10-19, 리스크가 적은 주제부터 조금 여는 1단계).
+//  - 글에 '국회' 가 들어 있으면 cat 이 '정책'이어야 해요. 하루 개수 제한(validateToday)과 알림 대표 제외(scripts/push.mjs)가 cat 으로 걸려요.
+//  - cat '정책' 카드는 아래 분야에만 둘 수 있고, 하루 MAX_POLICY_PER_DAY 개까지예요.
+//  - 정책 카드 글에 평가·편들기로 읽힐 수 있는 말(POLICY_TONE_WORDS)이 있으면 걸러요.
+const POLICY_CAT = '정책';
+const POLICY_WORD = '국회';
+const POLICY_GROUPS = ['econ', 'life', 'tech', 'world'];
+const MAX_POLICY_PER_DAY = 2;
+const POLICY_TONE_WORDS = ['날치기', '폭거', '꼼수', '졸속', '막말', '망언', '내로남불', '정쟁', '정치 공세'];
 
 const errors = [];
 const err = (where, msg) => errors.push(`${where}: ${msg}`);
@@ -303,9 +316,32 @@ function validateCard(card, where) {
     });
   }
 
+  validatePolicy(card, where);
   validateMedia(card, where);
   validateClips(card, where);
   validateScene(card, where);
+}
+
+// 정책 카드: 국회·정부가 이미 내린 결정·시행 사실만 다뤄요. 글에 '국회' 가 있으면 cat 은 '정책'이어야 하고,
+// '정책' 카드는 정해진 분야에만 두고, 평가·편들기로 읽히는 말 없이 써요.
+function validatePolicy(card, where) {
+  const texts = [];
+  for (const f of ['keyword', 'line', 'meaning', 'example']) if (typeof card[f] === 'string') texts.push([f, card[f]]);
+  if (Array.isArray(card.why)) card.why.forEach((w, i) => { if (typeof w === 'string') texts.push([`why[${i}]`, w]); });
+  if (card.cat !== POLICY_CAT) {
+    if (texts.some(([, t]) => t.includes(POLICY_WORD))) {
+      err(where, `'${POLICY_WORD}' 이 들어간 카드는 cat 을 '${POLICY_CAT}'으로 해야 해요 (국회·정부가 이미 내린 결정·시행 사실만 다뤄요)`);
+    }
+    return;
+  }
+  if (!POLICY_GROUPS.includes(card.group)) {
+    err(where, `cat '${POLICY_CAT}' 카드는 ${POLICY_GROUPS.join(' / ')} 분야에만 둘 수 있어요 (지금 ${card.group})`);
+  }
+  for (const [label, t] of texts) {
+    for (const w of POLICY_TONE_WORDS) {
+      if (t.includes(w)) err(where, `${label} 에 평가·편들기로 읽힐 수 있는 표현 '${w}' 가 있어요 (정책 카드는 결정·시행 사실만 담담하게 써요)`);
+    }
+  }
 }
 
 // scene 은 선택 항목이에요. 영상이 없는 해설에 앱이 '이모지로 만든 한 장면'을 분야별 그림 카드 위에 보여줘요.
@@ -474,6 +510,9 @@ function validateToday(today) {
       err(where, `카드 ${c.id} 의 date(${c.date}) 가 today.date(${today.date}) 와 달라요`);
     }
   });
+  // 정책 카드(국회·정부 결정·시행 사실)는 하루 MAX_POLICY_PER_DAY 개까지만 — 앱의 분위기가 정책 소식으로 기울지 않게 해요
+  const policyCount = today.cards.filter((c) => c && c.cat === POLICY_CAT).length;
+  if (policyCount > MAX_POLICY_PER_DAY) err(where, `cat '${POLICY_CAT}' 카드는 하루 ${MAX_POLICY_PER_DAY}개까지예요 (지금 ${policyCount}개)`);
   // 분야별 분포: 한 분야로 쏠리지 않게 막아요 (분야 목록 자체가 잘못됐으면 위에서 이미 알려줘요)
   if (GROUPS.length) {
     const kinds = Object.keys(perGroup).filter((g) => GROUPS.includes(g)).length;

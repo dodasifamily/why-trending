@@ -33,6 +33,9 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const HOURS = [7, 8, 9];
+// cat '정책' = 국회·정부가 이미 내린 결정·시행 사실을 다루는 카드 (scripts/content.mjs 의 POLICY_CAT 과 같은 값).
+// 오늘 해설 개수에는 넣지만, 알림에 내세우는 대표 소식으로는 쓰지 않아요.
+export const POLICY_CAT = '정책';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
@@ -72,15 +75,18 @@ export function buildMessages({ today, hour, date }) {
     cards.push(c);
   }
   if (!cards.length) return [];
+  // 정책 카드는 개수(count)에는 들어가지만 대표 소식으로는 쓰지 않아요 (대표로 쓸 카드가 정책 카드뿐인 날만 예외예요).
+  const nonPolicy = cards.filter((c) => c.cat !== POLICY_CAT);
+  const pool = nonPolicy.length ? nonPolicy : cards;
   const leads = [];
   const seen = new Set();
-  for (const c of cards) {
+  for (const c of pool) {
     if (leads.length >= 2) break;
     if (seen.has(c.group)) continue;
     seen.add(c.group);
     leads.push(c);
   }
-  for (const c of cards) {
+  for (const c of pool) {
     if (leads.length >= 2) break; // 분야가 하나뿐이면 같은 분야 카드로 채워요
     if (!leads.includes(c)) leads.push(c);
   }
