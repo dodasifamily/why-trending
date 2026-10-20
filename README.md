@@ -98,7 +98,7 @@
 - 앱 이름: **왜이슈?** (2026-10-18 에 '왜뜨지?' 에서 바꿨어요). 화면에 보이는 이름은 `site/js/app.js`·`site/index.html`·`site/privacy.html`, 폰 홈 화면에 보이는 이름은 `app/capacitor.config.json` 의 `appName` 이에요(새 시험용 앱을 설치해야 바뀌어요). 저장소 이름(`why-trending`)·사이트 주소·앱 ID·시험용 앱 파일 이름(`whyttuji-test.apk`)과 코드 안의 `whyttuji` 이름은 그대로 둬요. 해설 화면의 '왜 화제일까요?'(밈·신조어가 아닌 해설의 첫 칸은 '무슨 일이에요?', 밈·신조어는 '뜻')는 앱 이름이 아니라 해설의 소제목이에요.
 - GitHub Pages 는 켜져 있어요 (Source = GitHub Actions). 사이트 주소: https://dodasifamily.github.io/why-trending/
 - 출시용 서명 키: Settings → Secrets and variables → Actions 에 `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` 를 등록해요.
-- 광고: `site/js/config.js` 의 `ads` 와 `app/app.config.json` 의 AdMob 앱 ID 는 지금 구글 테스트 값이에요. 출시 전에 실제 값으로 바꿔요.
+- 광고: `site/js/config.js` 의 `ads` 와 `app/app.config.json` 의 AdMob 앱 ID 는 실제 값이에요(2026-10-20 에 테스트 값에서 바꿈).
 - '내용이 이상해요' 신고: `site/js/config.js` 의 `report.endpoint`(폼) 또는 `report.email`(메일)을 채우면 켜져요.
 
 ## 비밀 정보
