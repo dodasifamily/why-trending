@@ -1,10 +1,10 @@
 {
-  "appId": "io.github.dodasifamily.issuewhy",
+  "appId": "issue.why",
   "appName": "왜이슈?",
   "webDir": "www",
   "server": {
     "androidScheme": "https",
-    "hostname": "io.github.dodasifamily.issuewhy"
+    "hostname": "issue.why"
   },
   "plugins": {
     "LocalNotifications": {
