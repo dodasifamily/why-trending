@@ -99,6 +99,7 @@
   }
 
   const ICONS = {
+    link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
     right: '<path d="M9 5l7 7-7 7"></path>',
     left: '<path d="M15 5l-7 7 7 7"></path>',
     share: '<path d="M12 3v12M7 8l5-5 5 5"></path><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"></path>',
@@ -500,6 +501,38 @@
     return t ? h('span', { class: t === '오늘' ? 'dtag now' : 'dtag' }, t) : null;
   }
 
+  // ---------- 이슈 이어보기 (0.4.3) ----------
+  // 같은 이슈가 새 사실로 다시 올라오면 카드에 처음 보도일(firstDate)과 날짜별 한 줄 기록(updates)이 붙어요.
+  /** 처음 보도일부터 이 카드 날짜까지 며칠째인지 (기록이 없으면 0) */
+  function runDays(c) {
+    if (!c || !Array.isArray(c.updates) || c.updates.length < 2 || !YMD.test(c.firstDate || '') || !(c.firstDate < c.date)) return 0;
+    return daysApart(c.firstDate, c.date) + 1;
+  }
+  function runTag(c) {
+    const n = runDays(c);
+    return n ? h('span', { class: 'runtag' }, icon('link', 12), `${n}일째`) : null;
+  }
+  function mdText(s) {
+    const d = parseYmd(s);
+    return d ? `${d.getMonth() + 1}월 ${d.getDate()}일` : '';
+  }
+  /** 해설 화면의 '이슈 흐름': 오래된 기록부터, 마지막(지금 보고 있는 해설)에 '지금' 표시 */
+  function flowBlock(c) {
+    const n = runDays(c);
+    if (!n) return null;
+    const last = c.updates.length - 1;
+    return section(
+      `이슈 흐름 · ${n}일째 이어지는 이슈`,
+      h(
+        'ol',
+        { class: 'flow' },
+        ...c.updates.map((u, i) =>
+          h('li', { class: i === last ? 'now' : null }, h('span', { class: 'fd' }, mdText(u.date), i === last ? h('span', { class: 'fnow' }, '지금') : null), h('span', { class: 'fl' }, u.line))
+        )
+      )
+    );
+  }
+
   // ---------- 길 찾기(라우터) ----------
   // #/ 오늘 · #/t/<해설> 해설 · #/g/<분야> 그 분야의 지난 이슈까지 전부 · #/dict 검색 · #/alerts 알림 · #/pick 내 분야 고르기
   /** 주소에 든 %XX 를 글자로 되돌려요. 깨진 주소여도 오류 없이 빈 글자가 돼요 */
@@ -609,7 +642,7 @@
     return h(
       'button',
       { class: 'card', type: 'button', onclick: () => go('/t/' + encodeURIComponent(c.id)) },
-      h('span', { class: 'ctop' }, catPill(c), dayTag(c.date)),
+      h('span', { class: 'ctop' }, h('span', { class: 'cpills' }, catPill(c), runTag(c)), dayTag(c.date)),
       h('span', { class: 'kw' }, h('span', { class: 'hl' }, c.keyword)),
       h('span', { class: 'ln' }, c.line),
       h('span', { class: 'more' }, h('span', null, '왜 화제인지 보기'), icon('right'))
@@ -621,7 +654,7 @@
     return h(
       'button',
       { class: 'term', type: 'button', onclick: () => go('/t/' + encodeURIComponent(c.id)) },
-      h('span', { class: 'row' }, h('span', { class: 'nm' }, c.keyword), withDate ? h('span', { class: 'tg' }, withDot ? gdot(c.group) : null, h('span', { class: 'tcat' }, c.cat), dayTag(c.date)) : h('span', { class: 'tg' }, gdot(c.group), c.cat)),
+      h('span', { class: 'row' }, h('span', { class: 'nm' }, c.keyword), withDate ? h('span', { class: 'tg' }, withDot ? gdot(c.group) : null, h('span', { class: 'tcat' }, c.cat), runTag(c), dayTag(c.date)) : h('span', { class: 'tg' }, gdot(c.group), c.cat)),
       h('span', { class: 'ml', style: 'display:block' }, c.line)
     );
   }
@@ -1322,7 +1355,8 @@
       daysApart(c.date, todayYmd()) >= FEED_DAYS ? h('p', { class: 'stale', role: 'status' }, `${daysApart(c.date, todayYmd())}일 전 소식이에요. 지금은 내용이 달라졌을 수 있어요.`) : null,
       mediaBlock(c),
       section(c.group === 'meme' ? '뜻' : '무슨 일이에요?', h('p', null, c.meaning)),
-      section('왜 화제일까요?', c.why.map((t, i) => h('div', { class: 'why' }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 't' }, t))))
+      section('왜 화제일까요?', c.why.map((t, i) => h('div', { class: 'why' }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 't' }, t)))),
+      flowBlock(c)
     ];
     if (c.example) nodes.push(section('이렇게 써요 (예시)', exampleBlock(c)));
     const moreClips = clipsBlock(c);

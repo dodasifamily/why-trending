@@ -147,6 +147,12 @@ const TONE_WORDS = {
 //  - 글에 '국회' 가 들어 있으면 cat 이 '정책'이어야 해요. 하루 개수 제한(validateToday)과 알림 대표 제외(scripts/push.mjs)가 cat 으로 걸려요.
 //  - cat '정책' 카드는 아래 분야에만 둘 수 있고, 하루 MAX_POLICY_PER_DAY 개까지예요.
 //  - 정책 카드 글에 평가·편들기로 읽힐 수 있는 말(POLICY_TONE_WORDS)이 있으면 걸러요.
+// 이슈 이어보기 (2026-10-21, 사용자 요청): 같은 이슈를 새 사실로 다시 올리면(같은 id, 더 늦은 date) merge 가
+// 처음 보도일(firstDate)과 날짜별 한 줄 기록(updates: [{date, line}], 오래된 것부터, 마지막은 지금 카드)을 이어 붙여요.
+// 앱은 'N일째 이어지는 이슈' 배지와 해설 화면의 '이슈 흐름'으로 보여줘요. 카드에 직접 쓰지 않아도 돼요(merge 가 만들어요).
+const UPDATES_MAX = 8; // 기록이 넘치면 처음 것 1개와 최근 것들만 남겨요
+const UPDATE_LINE_MAX = 60;
+
 const POLICY_CAT = '정책';
 const POLICY_WORD = '국회';
 const POLICY_GROUPS = ['econ', 'life', 'tech', 'world'];
@@ -319,10 +325,63 @@ function validateCard(card, where) {
     });
   }
 
+  validateHistory(card, where);
   validatePolicy(card, where);
   validateMedia(card, where);
   validateClips(card, where);
   validateScene(card, where);
+}
+
+// 이슈 이어보기 기록: firstDate 와 updates 는 함께 있거나 함께 없어야 해요 (merge 가 만들어요).
+function validateHistory(card, where) {
+  const hasFirst = card.firstDate !== undefined;
+  const hasUpd = card.updates !== undefined;
+  if (!hasFirst && !hasUpd) return;
+  if (hasFirst !== hasUpd) return err(where, 'firstDate 와 updates 는 함께 있어야 해요 (직접 쓰지 말고 node scripts/content.mjs merge 가 만들게 두세요)');
+  if (!isRealDate(card.firstDate)) return err(where, 'firstDate 는 YYYY-MM-DD 형식의 실제 날짜여야 해요');
+  if (isRealDate(card.date) && card.firstDate >= card.date) err(where, `firstDate(${card.firstDate}) 는 카드 날짜(${card.date})보다 앞서야 해요 (처음 올린 날이면 기록을 두지 않아요)`);
+  const u = card.updates;
+  if (!Array.isArray(u) || u.length < 2 || u.length > UPDATES_MAX) return err(where, `updates 는 2~${UPDATES_MAX}개여야 해요`);
+  let prev = '';
+  u.forEach((x, i) => {
+    const w = `${where}.updates[${i}]`;
+    if (!x || typeof x !== 'object') return err(w, '기록이 객체가 아니에요');
+    if (!isRealDate(x.date)) err(w, 'date 는 YYYY-MM-DD 형식의 실제 날짜여야 해요');
+    else if (prev && x.date <= prev) err(w, `날짜가 앞 기록(${prev})보다 늦어야 해요 (오래된 것부터 써요)`);
+    if (isRealDate(x.date)) prev = x.date;
+    checkString(w, 'line', x.line, 4, UPDATE_LINE_MAX);
+    if (typeof x.line === 'string') {
+      scanBlocked(w, 'line', x.line);
+      scanTone(w, 'line', x.line);
+      if (card.cat === POLICY_CAT) for (const p of [...POLICY_TONE_WORDS, ...POLICY_PENDING_WORDS]) if (x.line.includes(p)) err(w, `정책 카드 기록에 '${p}' 를 쓰지 않아요`);
+    }
+  });
+  if (u[0] && u[0].date !== card.firstDate) err(where, `updates 의 첫 기록 날짜(${u[0].date})가 firstDate(${card.firstDate})와 달라요`);
+  const last = u[u.length - 1];
+  if (last && last.date !== card.date) err(where, `updates 의 마지막 기록 날짜(${last.date})가 카드 날짜(${card.date})와 달라요`);
+}
+
+// 기존 카드(old)에 새 카드(c)를 덮어쓸 때 이슈 기록을 이어 붙여요. 날짜가 같으면(같은 날 다시 merge) 마지막 줄만 고쳐요.
+function withHistory(old, c) {
+  if (!old || !isRealDate(old.date) || !isRealDate(c.date) || c.date < old.date) return c;
+  const prior = Array.isArray(old.updates) && old.updates.length ? old.updates.map((x) => ({ date: x.date, line: x.line })) : [{ date: old.date, line: old.line }];
+  const firstDate = old.firstDate || prior[0].date;
+  let list = prior.filter((x) => x.date < c.date);
+  if (!list.length) {
+    // 같은 날 처음 올린 카드를 다시 merge 한 경우: 기록이 생기지 않아요
+    const { firstDate: _f, updates: _u, ...plain } = c;
+    return plain;
+  }
+  list.push({ date: c.date, line: c.line });
+  if (list.length > UPDATES_MAX) list = [list[0], ...list.slice(list.length - (UPDATES_MAX - 1))];
+  const { firstDate: _f, updates: _u, ...rest } = c;
+  // firstDate·updates 는 date 바로 뒤에 두어요 (파일을 읽기 쉽게)
+  const out = {};
+  for (const [k, v] of Object.entries(rest)) {
+    out[k] = v;
+    if (k === 'date') { out.firstDate = firstDate; out.updates = list; }
+  }
+  return out;
 }
 
 // 정책 카드: 국회·정부가 이미 내린 결정·시행 사실만 다뤄요. 글에 '국회' 가 있으면 cat 은 '정책'이어야 하고,
@@ -600,11 +659,18 @@ function merge() {
   const today = readJson(TODAY_PATH);
   const terms = existsSync(TERMS_PATH) ? readJson(TERMS_PATH) : { schema: 1, updatedAt: today.updatedAt, terms: [] };
   if (!Array.isArray(terms.terms)) terms.terms = [];
-  for (const c of today.cards) {
+  let linked = 0;
+  today.cards = today.cards.map((c) => {
     const i = terms.terms.findIndex((x) => x.id === c.id);
-    if (i >= 0) terms.terms[i] = c;
-    else terms.terms.push(c);
-  }
+    const card = i >= 0 ? withHistory(terms.terms[i], c) : c;
+    if (card.updates) linked++;
+    if (i >= 0) terms.terms[i] = card;
+    else terms.terms.push(card);
+    return card;
+  });
+  // 오늘 카드에도 같은 기록을 담아 둬요 (today.json 과 사전의 내용이 같아야 validate 를 통과해요)
+  writeJson(TODAY_PATH, today);
+  if (linked) console.log(`🔗 이어지는 이슈 ${linked}개에 처음 보도일·업데이트 기록을 붙였어요`);
   // 최근에 해설한 말이 위로 오게 정렬 (같은 날짜면 기존 순서 유지)
   terms.terms = terms.terms
     .map((c, idx) => ({ c, idx }))

@@ -225,6 +225,21 @@ a { color: inherit; }
 .dtag { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .dtag.now { padding: 1px 8px; border-radius: 999px; background: var(--lime); color: var(--ink); font-weight: 700; }
 .tg .dtag { margin-left: 8px; }
+/* 이슈 이어보기 (0.4.3): 'N일째' 배지와 해설 화면의 이슈 흐름 */
+.cpills { display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+.runtag { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 700; line-height: 1.3; white-space: nowrap; }
+.tg .runtag { margin-left: 8px; padding: 1px 7px; font-size: 11px; }
+.flow { list-style: none; margin: 12px 0 0; padding: 0; }
+.flow li { position: relative; padding: 0 0 16px 22px; }
+.flow li::before { content: ''; position: absolute; left: 5px; top: 7px; width: 10px; height: 10px; border-radius: 50%; background: var(--card); border: 2px solid var(--muted); box-sizing: border-box; }
+.flow li::after { content: ''; position: absolute; left: 9px; top: 19px; bottom: -5px; width: 2px; background: var(--line); }
+.flow li:last-child { padding-bottom: 0; }
+.flow li:last-child::after { display: none; }
+.flow li.now::before { background: var(--cobalt); border-color: var(--cobalt); }
+.flow .fd { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.flow .fnow { padding: 0 7px; border-radius: 999px; background: var(--lime); color: var(--ink); font-size: 11px; line-height: 1.6; }
+.flow .fl { display: block; margin-top: 2px; font-size: 15px; line-height: 1.6; color: var(--body); }
+.flow li.now .fl { color: var(--ink); font-weight: 600; }
 @media (max-width: 359px) { .tg .tcat { display: none; } .tg .dtag { margin-left: 0; } }
 .card {
   display: block;
