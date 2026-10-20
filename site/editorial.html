@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>편집 원칙 – 왜이슈?</title>
+<style>
+  :root { --ink:#14161C; --body:#3A3F4F; --muted:#5A6072; --line:#DFE3EC; --cobalt:#3347FF; --ground:#F2F4F8; }
+  * { box-sizing: border-box; }
+  html { background: var(--ground); -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0 auto; max-width: 720px; padding: calc(env(safe-area-inset-top, 0px) + 24px) 20px calc(env(safe-area-inset-bottom, 0px) + 40px);
+    font-family: 'IBM Plex Sans KR', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    color: var(--body); line-height: 1.75; font-size: 16px; word-break: keep-all; overflow-wrap: break-word;
+  }
+  a { color: var(--cobalt); }
+  .back { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; text-decoration: none; }
+  h1 { margin: 8px 0 4px; color: var(--ink); font-size: 28px; line-height: 1.3; }
+  h2 { margin: 32px 0 8px; color: var(--ink); font-size: 18px; }
+  p, ul { margin: 8px 0; }
+  ul { padding-left: 22px; }
+  li { margin: 4px 0; }
+  .meta { color: var(--muted); font-size: 14px; margin: 0; }
+  :focus-visible { outline: 3px solid var(--cobalt); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<a class="back" href="./" onclick="if (history.length > 1) { history.back(); return false; }">← 돌아가기</a>
+<h1>편집 원칙</h1>
+<p class="meta">서비스: 왜이슈? (안드로이드 앱과 웹) · 시행일: 2026년 10월 20일</p>
+
+<h2>1. 무엇을 하는 서비스인가요</h2>
+<p>왜이슈?는 지금 기사와 게시글이 갑자기 늘어난 이슈가 <b>왜 화제가 됐는지</b>를, 여러 언론사가 확인한 사실만으로 30초 분량으로 설명해 주는 서비스예요. 직접 취재하지 않고, 이미 보도된 기사를 모아 쉽게 풀어 주는 해설(애그리게이터) 서비스예요.</p>
+
+<h2>2. AI 사용 안내</h2>
+<p>해설은 AI가 기사를 찾아 읽고 아래 원칙에 따라 정리한 요약이에요. 모든 해설에 'AI가 출처를 확인해 정리한 요약'이라는 안내와 출처 기사 링크를 함께 보여드려요. 틀리거나 오래된 내용이 있을 수 있으니, 이상하면 해설 화면의 '내용이 이상해요'로 알려주세요.</p>
+
+<h2>3. 출처와 사실 확인</h2>
+<ul>
+  <li>해설 하나마다 <b>서로 다른 언론사 2곳 이상</b>의 기사로 사실을 확인해요. 같은 통신사 기사를 여러 곳이 받아 쓴 것은 1곳으로 세요.</li>
+  <li>블로그·커뮤니티·위키·SNS 게시물·영상 댓글은 출처로 쓰지 않아요. SNS와 검색 순위는 '무엇이 화제인지' 찾는 단서로만 써요.</li>
+  <li>기사에 없는 원인·숫자는 추측해서 쓰지 않아요. 한 매체만 전한 내용은 그 매체 이름을 밝혀서 쓰고, 매체끼리 숫자가 다르면 쓰지 않거나 겹치는 부분만 써요.</li>
+  <li>모든 해설에 출처 기사의 언론사·제목·게시일·링크와 해설 날짜를 표시해요. 기사 문장을 그대로 옮기지 않고 쉬운 말로 다시 써요.</li>
+</ul>
+
+<h2>4. 최신성</h2>
+<ul>
+  <li>매일 아침 그날 화제가 된 이슈를 새로 정리해요. 해설의 가장 최근 출처는 1일 이내(유행어·밈은 3일 이내) 기사여야 하고, 14일보다 오래된 기사는 쓰지 않아요.</li>
+  <li>며칠 지난 해설에는 '며칠 전 소식'이라는 안내를 붙여요.</li>
+</ul>
+
+<h2>5. 다루지 않는 것</h2>
+<p>정당·정치인 간 공방과 선거, 전쟁·테러, 범죄·사건·사고·재난과 사망 소식, 수사·재판 중인 개인, 연예인의 사생활, 스포일러, 혐오·차별, 투자·의료·법률 조언, 일반인의 이름·얼굴·사연은 다루지 않아요. 국회·정부가 이미 내린 결정과 시행 사실은 평가 없이 사실만 전해요.</p>
+
+<h2>6. 중립과 표현</h2>
+<ul>
+  <li>평가·단정·추측·감정 표현 없이 사실만 담담하게 써요. 의견이 갈리는 숫자·주장은 양쪽을 모두 적고 어느 쪽도 편들지 않아요.</li>
+  <li>증시·환율 같은 시장 소식은 수치와 기사가 밝힌 이유만 전하고, 전망·종목 추천·투자 권유는 하지 않아요.</li>
+  <li>이 원칙 중 많은 부분은 해설을 올리기 전에 자동 검사로도 확인해요.</li>
+</ul>
+
+<h2>7. 정정과 문의</h2>
+<p>틀린 내용을 알려주시면 확인 후 고쳐요. 운영자: 개인 개발자 (GitHub: <a href="https://github.com/dodasifamily">dodasifamily</a>) · 문의 이메일: <a href="mailto:issuewhyhelp@gmail.com">issuewhyhelp@gmail.com</a> · 개인정보 관련 내용은 <a href="privacy.html">개인정보처리방침</a>을 봐 주세요.</p>
+</body>
+</html>
