@@ -152,6 +152,9 @@ const POLICY_WORD = '국회';
 const POLICY_GROUPS = ['econ', 'life', 'tech', 'world'];
 const MAX_POLICY_PER_DAY = 2;
 const POLICY_TONE_WORDS = ['날치기', '폭거', '꼼수', '졸속', '막말', '망언', '내로남불', '정쟁', '정치 공세'];
+// 2026-10-20(사용자 결정): 아직 정해지지 않은 일(미확정 정책)은 지침뿐 아니라 검사로도 막아요. '○월 ○일부터 시행 예정'처럼
+// 이미 결정된 일정은 괜찮으니 '예정'은 막지 않아요.
+const POLICY_PENDING_WORDS = ['추진', '발의', '상정', '계류', '입법예고', '검토 중', '검토하고', '검토할', '논의 중', '논의하고', '협의 중', '협상 중', '방침', '가닥', '유력'];
 
 const errors = [];
 const err = (where, msg) => errors.push(`${where}: ${msg}`);
@@ -340,6 +343,9 @@ function validatePolicy(card, where) {
   for (const [label, t] of texts) {
     for (const w of POLICY_TONE_WORDS) {
       if (t.includes(w)) err(where, `${label} 에 평가·편들기로 읽힐 수 있는 표현 '${w}' 가 있어요 (정책 카드는 결정·시행 사실만 담담하게 써요)`);
+    }
+    for (const w of POLICY_PENDING_WORDS) {
+      if (t.includes(w)) err(where, `${label} 에 아직 정해지지 않은 일을 뜻하는 표현 '${w}' 가 있어요 (정책 카드는 이미 결정·시행된 사실만 다뤄요)`);
     }
   }
 }
