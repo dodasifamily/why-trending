@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       base:
-        description: '비교할 앞 커밋 (비우면 바로 앞 커밋)'
+        description: '비교할 앞 커밋의 전체 해시 40자 (비우면 바로 앞 커밋)'
         required: false
         default: ''
       dry_run:
