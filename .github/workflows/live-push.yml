@@ -1,0 +1,54 @@
+name: 항상 알림 보내기
+
+# 알림 설정에서 '항상'을 고른 기기에, 하루 중 추가 해설이 올라올 때마다 '내 분야 새 이슈'를 알려요 (2026-10-21, 앱 0.4.4).
+# 추가 해설 담당이 'More cards …' 커밋으로 today.json 을 올리면 바로 돌아요. 아침 카드('Daily cards …')는 아침 알림(push.yml)이 맡아요.
+# 보내는 방법과 규칙은 scripts/push.mjs 의 '항상 알림' 부분에 있어요. 새 카드가 없으면 보내지 않아요.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/data/today.json'
+  workflow_dispatch:
+    inputs:
+      base:
+        description: '비교할 앞 커밋 (비우면 바로 앞 커밋)'
+        required: false
+        default: ''
+      dry_run:
+        description: '보내지 않고 내용만 보기 (true 또는 false)'
+        required: true
+        default: 'true'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-push
+  cancel-in-progress: false
+
+jobs:
+  send:
+    if: github.repository == 'dodasifamily/why-trending' && (github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'More cards'))
+    name: 항상 알림 보내기
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 항상 알림 보내기
+        env:
+          FCM_SERVICE_ACCOUNT_JSON: ${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}
+          LIVE: '1'
+          LIVE_BASE: ${{ github.event_name == 'workflow_dispatch' && inputs.base || 'HEAD^' }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+        run: |
+          if [ -n "$LIVE_BASE" ] && [ "$LIVE_BASE" != "HEAD^" ]; then git fetch --quiet --depth=1 origin "$LIVE_BASE" || true; fi
+          export LIVE_BASE="${LIVE_BASE:-HEAD^}"
+          node scripts/push.mjs

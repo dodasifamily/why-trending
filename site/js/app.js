@@ -58,6 +58,7 @@
     dictGroup: 'all', // 검색 화면에서 보고 있는 분야 ('all' = 전체)
     alertOn: store.get('alertOn', false) === true,
     hour: HOURS.includes(store.get('hour', 8)) ? store.get('hour', 8) : 8,
+    live: store.get('live', false) === true, // '항상' 알림 (0.4.4): 아침 7시 알림 + 내 분야에 새 이슈가 올라올 때마다
     alertMsg: '',
     alertBusy: 0, // 푸시 구독을 맞추는 중인 작업 수 (인터넷이 느릴 때 '설정하는 중' 표시용)
     reported: store.get('reported', {}),
@@ -1466,6 +1467,7 @@
   function saveAlert() {
     store.set('alertOn', S.alertOn);
     store.set('hour', S.hour);
+    store.set('live', S.live);
   }
 
   // ---------- 푸시 알림 (Firebase, 안드로이드 앱에서만) ----------
@@ -1488,8 +1490,13 @@
   /** 지금 구독하고 있어야 하는 주제들 (알림이 꺼져 있거나 분야를 안 골랐으면 없어요) */
   function wantedTopics() {
     if (!S.alertOn) return [];
-    const cats = (S.cats || []).filter((id) => TOPIC_RE.test(id)).map((id) => 'cat_' + id);
-    return cats.length ? cats.concat('h' + S.hour) : [];
+    const ids = (S.cats || []).filter((id) => TOPIC_RE.test(id));
+    const cats = ids.map((id) => 'cat_' + id);
+    if (!cats.length) return [];
+    // '항상'을 고르면 아침 7시 알림에 더해, 고른 분야마다 'live_<분야>' 를 구독해요. 서버(scripts/push.mjs)는 추가 해설이 올라올 때
+    // 새 카드가 있는 분야의 live 주제로 보내고, 여러 분야를 고른 기기에는 하나만 가게 해요.
+    const live = S.live && fcm() ? ids.map((id) => 'live_' + id).filter((t) => TOPIC_RE.test(t)) : [];
+    return cats.concat('h' + (S.live && fcm() ? 7 : S.hour), live);
   }
 
   function withTimeout(promise, ms) {
@@ -1670,7 +1677,7 @@
           renderAlerts();
         }
       },
-      h('span', { style: 'display:block' }, h('span', { class: 'l1' }, '아침 알림'), h('span', { class: 'l2' }, push ? '오늘의 화제 이슈를 하루 한 번 알려드려요' : '오늘의 화제 이슈가 준비되면 알려드려요')),
+      h('span', { style: 'display:block' }, h('span', { class: 'l1' }, push ? '알림' : '아침 알림'), h('span', { class: 'l2' }, push ? (S.live ? '아침에 한 번, 그리고 내 분야에 새 이슈가 올라올 때마다 알려드려요' : '오늘의 화제 이슈를 하루 한 번 알려드려요') : '오늘의 화제 이슈가 준비되면 알려드려요')),
       sw
     );
 
@@ -1680,10 +1687,11 @@
         {
           class: 'chip',
           type: 'button',
-          'aria-pressed': S.hour === hr ? 'true' : 'false',
+          'aria-pressed': S.hour === hr && !(S.live && push) ? 'true' : 'false',
           disabled: !canNotify,
           onclick: async () => {
             S.hour = hr;
+            S.live = false;
             saveAlert();
             if (S.alertOn) await runAlert();
             renderAlerts();
@@ -1692,6 +1700,29 @@
         hr + '시'
       )
     );
+    // '항상': 아침 7시 알림 + 내 분야 새 이슈가 올라올 때마다 (10:00·12:30·15:00·18:30·20:00 업데이트 뒤, 새 카드가 있을 때만). 푸시를 쓰는 앱에서만
+    if (push) {
+      hourChips.push(
+        h(
+          'button',
+          {
+            class: 'chip',
+            type: 'button',
+            'aria-pressed': S.live ? 'true' : 'false',
+            disabled: !canNotify,
+            onclick: async () => {
+              S.live = true;
+              S.hour = 7;
+              saveAlert();
+              if (S.alertOn) await runAlert();
+              renderAlerts();
+            }
+          },
+          '항상'
+        )
+      );
+    }
+    const liveNote = push && S.live ? h('p', { class: 'sub', style: 'margin:10px 0 0' }, '아침 7시 반쯤 한 번, 그리고 낮 동안(10시·12시 반·3시·6시 반·8시쯤) 내 분야에 새 이슈가 올라오면 알려드려요. 새 이슈가 없으면 보내지 않아요.') : null;
 
     const mine = myCats();
     const myPills = mine
@@ -1704,14 +1735,14 @@
       [
         h('h1', { class: 'h2big' }, '알림'),
         h('p', { class: 'sub' }, push ? '오늘 새로 올라온 화제 이슈를 아침에 한 번에 알려드려요' : '매일 아침 오늘의 이슈 해설이 나왔다고 알려드려요'),
-        h('div', { class: 'panel' }, toggle, h('div', { class: 'label' }, '받는 시간'), h('div', { class: 'chips' }, hourChips), S.alertBusy > 0 && h('div', { class: 'status', role: 'status', style: 'margin-top:14px' }, '알림을 설정하는 중이에요…'), S.alertBusy === 0 && S.alertMsg && h('div', { class: 'status warn', role: 'status', style: 'margin-top:14px' }, S.alertMsg)),
+        h('div', { class: 'panel' }, toggle, h('div', { class: 'label' }, '받는 시간'), h('div', { class: 'chips' }, hourChips), liveNote, S.alertBusy > 0 && h('div', { class: 'status', role: 'status', style: 'margin-top:14px' }, '알림을 설정하는 중이에요…'), S.alertBusy === 0 && S.alertMsg && h('div', { class: 'status warn', role: 'status', style: 'margin-top:14px' }, S.alertMsg)),
         h(
           'div',
           { class: 'panel' },
           h('div', { class: 'ptitle' }, '내 분야'),
           myPills.length ? h('div', { class: 'mypills', style: 'margin-top:12px' }, myPills) : h('p', { class: 'sub', style: 'margin:8px 0 0' }, S.groups ? '아직 고르지 않았어요.' : '분야 목록을 불러오지 못했어요.'),
           S.groups ? h('button', { class: 'btn ghost', type: 'button', style: 'margin-top:14px', onclick: () => go('/pick') }, '분야 바꾸기') : null,
-          h('div', { class: 'info' }, icon('info', 16), h('span', null, push ? '앱 화면에는 고른 분야의 이슈만 보여드려요. 알림은 분야와 상관없이 하루 한 번, 오늘 새로 올라온 이슈를 한꺼번에 알려드려요. 정한 시각보다 몇 분 늦게 올 수 있어요. 확인된 사실만 전하고, 정치 공방과 범죄·사고, 확인되지 않은 의혹은 다루지 않아요.' : '고른 분야의 이슈만 오늘 화면에 보여요. 확인된 사실만 전하고, 정치 공방과 범죄·사고, 확인되지 않은 의혹은 다루지 않아요.'))
+          h('div', { class: 'info' }, icon('info', 16), h('span', null, push ? '앱 화면에는 고른 분야의 이슈만 보여드려요. 아침 알림은 분야와 상관없이 하루 한 번, 오늘 새로 올라온 이슈를 한꺼번에 알려드려요. \'항상\'을 고르면 낮 동안 고른 분야에 새 이슈가 올라올 때도 알려드려요. 정한 시각보다 몇 분 늦게 올 수 있어요. 확인된 사실만 전하고, 정치 공방과 범죄·사고, 확인되지 않은 의혹은 다루지 않아요.' : '고른 분야의 이슈만 오늘 화면에 보여요. 확인된 사실만 전하고, 정치 공방과 범죄·사고, 확인되지 않은 의혹은 다루지 않아요.'))
         ),
         h('div', { class: 'info' }, icon('info', 16), h('span', null, AI_NOTE)),
         h('p', { class: 'legal' }, h('a', { href: 'privacy.html' }, '개인정보처리방침'))

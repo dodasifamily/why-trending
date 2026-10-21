@@ -103,6 +103,59 @@ export function buildMessages({ today, hour, date }) {
   ];
 }
 
+// ---------- '항상' 알림 (2026-10-21 사용자 요청, 앱 0.4.4) ----------
+// 알림 설정에서 '항상'을 고른 기기는 고른 분야마다 'live_<분야>' 주제를 구독해요.
+// 하루 중 추가 해설('More cards …' 커밋)이 올라오면, 그 커밋에서 새로 생기거나 새 사실로 바뀐 카드를 분야별로 모아
+// 그 분야를 고른 기기에만 알려요. 여러 분야를 고른 기기에 알림이 여러 개 가지 않도록, 분야 순서대로
+// 'live_g2 in topics && !(live_g1 in topics)' 처럼 앞 분야를 고른 기기를 빼고 보내요 (기기마다 딱 1개).
+// FCM 조건식에는 주제를 5개까지만 쓸 수 있어서 한 번에 5개 분야까지 보내요. 새 카드가 없으면 보내지 않아요.
+export const LIVE_MAX_GROUPS = 5;
+export function liveTopic(group) {
+  return 'live_' + group;
+}
+/** 앞 today.json(base) 과 비교해 새로 생기거나 line 이 바뀐 오늘 카드 (정책 카드는 빼요) */
+export function newCards({ base, today, date }) {
+  const old = new Map(((base && base.date === date && base.cards) || []).map((c) => [c && c.id, c]));
+  return ((today && today.cards) || []).filter((c) => {
+    if (!c || c.date !== date || typeof c.id !== 'string' || typeof c.group !== 'string' || !/^[a-z0-9_]{1,24}$/.test(c.group)) return false;
+    if (typeof c.keyword !== 'string' || !c.keyword.trim() || c.cat === POLICY_CAT) return false;
+    const o = old.get(c.id);
+    return !o || o.line !== c.line;
+  });
+}
+export function buildLiveMessages({ base, today, date, labels = {} }) {
+  const fresh = newCards({ base, today, date });
+  const order = [];
+  const byGroup = new Map();
+  for (const c of fresh) {
+    if (!byGroup.has(c.group)) {
+      byGroup.set(c.group, []);
+      order.push(c.group);
+    }
+    byGroup.get(c.group).push(c);
+  }
+  // 새 카드가 많은 분야부터 (같으면 today.json 앞쪽 = 더 화제인 것부터)
+  order.sort((a, b) => byGroup.get(b).length - byGroup.get(a).length);
+  const groups = order.slice(0, LIVE_MAX_GROUPS);
+  if (order.length > groups.length) console.log(`ℹ️ 한 번에 ${LIVE_MAX_GROUPS}개 분야까지만 보내서 ${order.slice(LIVE_MAX_GROUPS).join(', ')} 분야는 이번에 건너뛰어요`);
+  return groups.map((g, i) => {
+    const cards = byGroup.get(g);
+    const cond = [`'${liveTopic(g)}' in topics`, ...groups.slice(0, i).map((p) => `!('${liveTopic(p)}' in topics)`)].join(' && ');
+    const label = labels[g] || g;
+    const lead = cards.slice(0, 2).map((c) => c.keyword.trim());
+    const rest = cards.length - lead.length;
+    return {
+      group: g,
+      condition: cond,
+      title: `${label} 새 이슈${cards.length > 1 ? ` ${cards.length}개` : ''}`,
+      body: `${lead.join(', ')}${rest > 0 ? ` 외 ${rest}개` : ''} · 왜 화제인지 30초로 알아봐요`,
+      route: cards.length === 1 ? '/t/' + encodeURIComponent(cards[0].id) : '/',
+      count: cards.length,
+      live: true
+    };
+  });
+}
+
 /** FCM HTTP v1 요청 본문 (m.topic 이 있으면 그 주제로, 없으면 m.condition 조건으로 보내요) */
 export function toFcmBody(m, { validateOnly = false } = {}) {
   return {
@@ -111,12 +164,19 @@ export function toFcmBody(m, { validateOnly = false } = {}) {
       ...(m.topic ? { topic: m.topic } : { condition: m.condition }),
       notification: { title: m.title, body: m.body },
       data: { route: m.route, group: m.group },
-      android: {
-        priority: 'high', // 정한 시각에 맞춰 도착해야 해서 high 예요 (normal 은 잠든 기기에 몇 시간 늦게 갈 수 있어요). 하루 한 번만 보내요
-        ttl: '21600s', // 6시간 안에 못 받으면 버려요. 저녁에 '아침 알림'이 도착하지 않게 해요
-        collapse_key: `daily_${m.group}`,
-        notification: { channel_id: 'daily', tag: `daily_${m.group}`, icon: 'ic_stat_whyttuji', color: '#3347FF' }
-      }
+      android: m.live
+        ? {
+            priority: 'high',
+            ttl: '7200s', // '항상' 알림은 2시간 안에 못 받으면 버려요 (다음 추가 해설과 겹치지 않게)
+            collapse_key: 'live',
+            notification: { channel_id: 'daily', tag: 'live', icon: 'ic_stat_whyttuji', color: '#3347FF' } // 같은 tag 라 앞 알림을 새 알림이 바꿔요
+          }
+        : {
+            priority: 'high', // 정한 시각에 맞춰 도착해야 해서 high 예요 (normal 은 잠든 기기에 몇 시간 늦게 갈 수 있어요). 하루 한 번만 보내요
+            ttl: '21600s', // 6시간 안에 못 받으면 버려요. 저녁에 '아침 알림'이 도착하지 않게 해요
+            collapse_key: `daily_${m.group}`,
+            notification: { channel_id: 'daily', tag: `daily_${m.group}`, icon: 'ic_stat_whyttuji', color: '#3347FF' }
+          }
     }
   };
 }
@@ -248,9 +308,10 @@ export function readRemoteFromGit() {
 
 // ---------- 실행 ----------
 function parseArgs(argv) {
-  const a = { dryRun: false, hour: undefined, wait: undefined };
+  const a = { dryRun: false, hour: undefined, wait: undefined, live: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--dry-run') a.dryRun = true;
+    else if (argv[i] === '--live') a.live = true;
     else if (argv[i] === '--hour') a.hour = argv[++i];
     else if (argv[i] === '--wait') a.wait = argv[++i];
   }
@@ -259,6 +320,7 @@ function parseArgs(argv) {
 
 export async function main({ argv = process.argv.slice(2), env = process.env, fetchImpl = fetch, wait = sleep, now = Date.now, readLocal, readRemote, readFile } = {}) {
   const args = parseArgs(argv);
+  if (args.live || env.LIVE === '1') return mainLive({ env, dry: args.dryRun || env.DRY_RUN === '1' || String(env.DRY_RUN).toLowerCase() === 'true', fetchImpl, wait, now, readLocal, readFile });
   let hours = [Number(args.hour ?? env.HOUR ?? 8)];
   let dry = args.dryRun || env.DRY_RUN === '1' || String(env.DRY_RUN).toLowerCase() === 'true';
   let waitMin = Math.max(0, Number(args.wait ?? env.WAIT_MIN ?? 0) || 0);
@@ -380,6 +442,83 @@ export async function main({ argv = process.argv.slice(2), env = process.env, fe
     failed += failedHere;
     notice(validateOnly ? '아침 알림 (검사만)' : '아침 알림', `${date} ${hour}시: ${sent.length ? (validateOnly ? '검사 통과, 기기에는 보내지 않았어요' : '보냄') : '못 보냄'} — ${messages[0].title} / ${messages[0].body}${failedHere ? ` (${failedHere}개 실패)` : ''}`);
   }
+  return failed ? 1 : 0;
+}
+
+/**
+ * '항상' 알림 보내기. push 된 today.json(지금 폴더)과 그 앞 커밋(LIVE_BASE, 기본 HEAD^)의 today.json 을 비교해요.
+ * readLocal(kind) 로 'today' · 'base' · 'categories' 를 바꿔 끼울 수 있어요 (시험용).
+ */
+export async function mainLive({ env = process.env, dry = false, fetchImpl = fetch, wait = sleep, now = Date.now, readLocal } = {}) {
+  const date = kstDate(now());
+  const read = (kind) => {
+    if (readLocal) return readLocal(kind);
+    if (kind === 'today') return readJson('site/data/today.json');
+    if (kind === 'categories') return readJson('site/data/categories.json');
+    return gitShow(env.LIVE_BASE || 'HEAD^', 'site/data/today.json');
+  };
+  let today, base, labels = {};
+  try {
+    today = read('today');
+  } catch (e) {
+    console.error('❌ today.json 을 읽지 못했어요');
+    return 1;
+  }
+  try {
+    base = read('base');
+  } catch (e) {
+    base = null; // 앞 커밋을 못 읽으면 오늘 카드 전부가 새 카드로 잡혀요 → 너무 많이 알리지 않게 보내지 않아요
+  }
+  if (!base) {
+    warning('항상 알림을 보내지 않았어요', '앞 커밋의 today.json 을 읽지 못해서 무엇이 새 카드인지 알 수 없어요.');
+    return 0;
+  }
+  try {
+    for (const g of read('categories').groups || []) if (g && g.id) labels[g.id] = g.label;
+  } catch (e) {
+    labels = {};
+  }
+  if (!today || today.date !== date) {
+    console.log(`오늘(${date}) 해설이 아니라서 항상 알림을 보내지 않아요.`);
+    return 0;
+  }
+  const messages = buildLiveMessages({ base, today, date, labels });
+  console.log(`${date} 항상 알림: ${messages.length}개 분야${dry ? ' — 시험 보기(보내지 않아요)' : ''}`);
+  if (!messages.length) return 0;
+  for (const m of messages) console.log(`- [${m.group}] ${m.title} / ${m.body}\n    조건: ${m.condition}  열기: ${m.route}`);
+  if (dry) {
+    notice('항상 알림 시험 보기 (보내지 않아요)', messages.map((m) => `${m.title} / ${m.body}`).join('\n'));
+    return 0;
+  }
+  if (!env.FCM_SERVICE_ACCOUNT_JSON) {
+    notice('항상 알림을 건너뛰었어요', 'FCM_SERVICE_ACCOUNT_JSON 이 등록되지 않았어요.');
+    return 0;
+  }
+  let sa;
+  try {
+    sa = parseServiceAccount(env.FCM_SERVICE_ACCOUNT_JSON);
+  } catch (e) {
+    failure('서비스 계정 키가 이상해요', e.message);
+    return 1;
+  }
+  let accessToken;
+  try {
+    accessToken = await getAccessToken(sa, fetchImpl);
+  } catch (e) {
+    failure('접근 토큰을 받지 못했어요', e.message);
+    return 1;
+  }
+  let failed = 0;
+  for (const m of messages) {
+    try {
+      await sendOne({ accessToken, projectId: sa.project_id, body: toFcmBody(m), fetchImpl, wait });
+      console.log(`✅ [${m.group}] 보냈어요`);
+    } catch (e) {
+      failed++;
+      failure(`${m.group} 항상 알림을 못 보냈어요`, e.message);
+    }
+  }
+  notice('항상 알림', `${date}: ${messages.length - failed}개 분야 보냄 — ${messages.map((m) => m.title).join(', ')}`);
   return failed ? 1 : 0;
 }
 
