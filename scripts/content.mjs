@@ -326,6 +326,7 @@ function validateCard(card, where) {
   }
 
   validateHistory(card, where);
+  checkDirection(card, where);
   validatePolicy(card, where);
   validateMedia(card, where);
   validateClips(card, where);
@@ -347,7 +348,8 @@ function validateHistory(card, where) {
     const w = `${where}.updates[${i}]`;
     if (!x || typeof x !== 'object') return err(w, '기록이 객체가 아니에요');
     if (!isRealDate(x.date)) err(w, 'date 는 YYYY-MM-DD 형식의 실제 날짜여야 해요');
-    else if (prev && x.date <= prev) err(w, `날짜가 앞 기록(${prev})보다 늦어야 해요 (오래된 것부터 써요)`);
+    else if (prev && x.date < prev) err(w, `날짜가 앞 기록(${prev})보다 앞서요 (오래된 것부터 써요)`);
+    else if (i > 0 && u[i - 1] && u[i - 1].date === x.date && u[i - 1].line === x.line) err(w, '바로 앞 기록과 똑같아요');
     if (isRealDate(x.date)) prev = x.date;
     checkString(w, 'line', x.line, 4, UPDATE_LINE_MAX);
     if (typeof x.line === 'string') {
@@ -366,13 +368,15 @@ function withHistory(old, c) {
   if (!old || !isRealDate(old.date) || !isRealDate(c.date) || c.date < old.date) return c;
   const prior = Array.isArray(old.updates) && old.updates.length ? old.updates.map((x) => ({ date: x.date, line: x.line })) : [{ date: old.date, line: old.line }];
   const firstDate = old.firstDate || prior[0].date;
-  let list = prior.filter((x) => x.date < c.date);
-  if (!list.length) {
-    // 같은 날 처음 올린 카드를 다시 merge 한 경우: 기록이 생기지 않아요
+  // 같은 날 다시 고친 카드(예: 아침 → 점심 갱신)도 앞 기록을 지우지 않고 한 줄을 더해요. 같은 문장이면(같은 날 merge 를 다시 한 경우) 더하지 않아요.
+  let list = prior.filter((x) => x.date <= c.date);
+  const lastLine = list.length ? list[list.length - 1] : null;
+  if (!(lastLine && lastLine.date === c.date && lastLine.line === c.line)) list.push({ date: c.date, line: c.line });
+  if (list.length < 2 || !(list[0].date < c.date)) {
+    // 오늘 처음 올린 카드: 처음 보도일이 오늘이면 '이어지는 이슈'가 아니라서 기록을 두지 않아요
     const { firstDate: _f, updates: _u, ...plain } = c;
     return plain;
   }
-  list.push({ date: c.date, line: c.line });
   if (list.length > UPDATES_MAX) list = [list[0], ...list.slice(list.length - (UPDATES_MAX - 1))];
   const { firstDate: _f, updates: _u, ...rest } = c;
   // firstDate·updates 는 date 바로 뒤에 두어요 (파일을 읽기 쉽게)
@@ -382,6 +386,23 @@ function withHistory(old, c) {
     if (k === 'date') { out.firstDate = firstDate; out.updates = list; }
   }
   return out;
+}
+
+// 키워드와 지금 내용(line)의 방향이 반대면 헷갈려요 (2026-10-21 사용자 지적: '코스피 급락' 카드가 반등 내용으로 갱신됨).
+// 이슈가 뒤집히면 키워드를 지금 상태나 흐름 전체를 담는 말(예: '코스피 급등락')로 바꿔요. id 는 그대로 둬요.
+const DOWN_WORDS = ['급락', '폭락', '하락', '약세', '추락'];
+const UP_WORDS = ['반등', '급등', '폭등', '상승', '강세', '되찾'];
+function checkDirection(card, where) {
+  if (typeof card.keyword !== 'string' || typeof card.line !== 'string') return;
+  const has = (t, ws) => ws.some((w) => t.includes(w));
+  const kDown = has(card.keyword, DOWN_WORDS);
+  const kUp = has(card.keyword, UP_WORDS);
+  if (kDown === kUp) return; // 둘 다 없거나(방향 없음) 둘 다 있으면(급등락 같은 흐름 말) 괜찮아요
+  const lDown = has(card.line, DOWN_WORDS);
+  const lUp = has(card.line, UP_WORDS);
+  if ((kDown && lUp && !lDown) || (kUp && lDown && !lUp)) {
+    err(where, `keyword '${card.keyword}' 와 line 의 방향이 반대예요. 이슈가 뒤집혔으면 키워드를 지금 상태나 흐름 전체를 담는 말(예: '코스피 급등락')로 바꿔요`);
+  }
 }
 
 // 정책 카드: 국회·정부가 이미 내린 결정·시행 사실만 다뤄요. 글에 '국회' 가 있으면 cat 은 '정책'이어야 하고,
@@ -671,10 +692,12 @@ function merge() {
   // 오늘 카드에도 같은 기록을 담아 둬요 (today.json 과 사전의 내용이 같아야 validate 를 통과해요)
   writeJson(TODAY_PATH, today);
   if (linked) console.log(`🔗 이어지는 이슈 ${linked}개에 처음 보도일·업데이트 기록을 붙였어요`);
-  // 최근에 해설한 말이 위로 오게 정렬 (같은 날짜면 기존 순서 유지)
+  // 최근에 해설한 말이 위로 오게 정렬. 오늘 카드끼리는 today.json 순서(새로 올린 것이 앞)를 그대로 따라요 (2026-10-21 사용자 요청: 가장 최신 이슈를 맨 위에)
+  const todayPos = new Map(today.cards.map((c, i) => [c.id, i]));
+  const rank = (c, idx) => (c.date === today.date && todayPos.has(c.id) ? todayPos.get(c.id) : today.cards.length + idx);
   terms.terms = terms.terms
     .map((c, idx) => ({ c, idx }))
-    .sort((a, b) => (a.c.date < b.c.date ? 1 : a.c.date > b.c.date ? -1 : a.idx - b.idx))
+    .sort((a, b) => (a.c.date < b.c.date ? 1 : a.c.date > b.c.date ? -1 : rank(a.c, a.idx) - rank(b.c, b.idx)))
     .map((x) => x.c);
   terms.schema = 1;
   terms.updatedAt = today.updatedAt;
