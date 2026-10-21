@@ -20,7 +20,7 @@ TITLE="왜이슈 시험용 앱 (최신)"
 APK="$(ls app/android/app/build/outputs/apk/debug/*.apk | head -n 1)"
 cp "$APK" whyttuji-test.apk
 LOCAL_SIZE="$(wc -c < whyttuji-test.apk | tr -d ' ')"
-NOTES="폰에 바로 설치해 써볼 수 있는 시험용 앱이에요. 광고는 구글 테스트 광고만 나와요. 정식 출시용이 아니에요. (빌드 ${GITHUB_RUN_NUMBER:-?}, 커밋 ${GITHUB_SHA:0:7})"
+NOTES="폰에 바로 설치해 써볼 수 있는 시험용 앱이에요. 실제 광고가 나오니 광고는 누르지 마세요(AdMob 정책). 플레이 스토어 버전과 서명이 달라서, 스토어 버전을 깔려면 이 앱을 먼저 지워야 해요. (빌드 ${GITHUB_RUN_NUMBER:-?}, 커밋 ${GITHUB_SHA:0:7})"
 PAUSE="${RELEASE_RETRY_PAUSE:-8}"
 
 # 이 태그의 릴리스들을 "id<TAB>초안<TAB>시험판" 줄로 보여줘요
