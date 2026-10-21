@@ -691,8 +691,22 @@
    * 분야 하나: 제목 + 가장 최근 해설은 큰 카드로, 나머지는 작은 카드로 (days = 보여주는 기간).
    * 제목 줄을 누르면 그 분야의 지난 이슈까지 전부 보여주는 화면으로 가요. (분야 목록에 없는 '기타'는 누를 수 없어요)
    */
-  function sectionNode(sec, days) {
+  /**
+   * 오늘 화면에서 분야마다 보여주는 카드 수 (2026-10-22 사용자 요청: 고른 분야가 많을수록 분야마다 적게).
+   * 큰 카드 1개를 포함한 개수예요. 넘치는 이슈는 '○○ 이슈 N개 더 보기'로 그 분야 화면(전체 보기)에서 봐요.
+   * 분야를 1개만 고르면 그 분야 화면과 같아서 제한 없이(20개씩 펼치기) 보여줘요.
+   */
+  function sectionLimit(n) {
+    if (n <= 1) return Infinity;
+    if (n === 2) return 10;
+    if (n <= 4) return 6;
+    if (n <= 6) return 4;
+    return 3;
+  }
+
+  function sectionNode(sec, days, limit) {
     const items = sec.cards;
+    const cap = limit === undefined ? Infinity : limit;
     const count = items.length ? h('span', { class: 'secn' }, items.length + '개') : null;
     const head = sec.id
       ? h(
@@ -710,8 +724,19 @@
       'section',
       { class: 'sec', 'aria-label': sec.label },
       h('div', { class: 'sechead' }, head, sec.id ? null : count),
-      items.length ? [cardButton(items[0]), pagedRows(items.slice(1), 's:' + (sec.id || '_'), (c) => termRow(c, true))] : h('p', { class: 'secnone' }, noneText(days))
+      items.length ? sectionBody(sec, items, cap) : h('p', { class: 'secnone' }, noneText(days))
     );
+  }
+
+  function sectionBody(sec, items, cap) {
+    if (cap === Infinity || !sec.id) return [cardButton(items[0]), pagedRows(items.slice(1), 's:' + (sec.id || '_'), (c) => termRow(c, true))];
+    const rows = items.slice(1, cap);
+    const left = items.length - 1 - rows.length;
+    return [
+      cardButton(items[0]),
+      rows.length ? h('div', { class: 'tlist' }, rows.map((c) => termRow(c, true))) : null,
+      left > 0 ? h('button', { class: 'btn ghost morebtn', type: 'button', onclick: () => openGroup(sec.id) }, `${sec.label} 이슈 ${left}개 더 보기`, icon('right', 16)) : null
+    ];
   }
 
   function myCatsRow(days) {
@@ -753,7 +778,8 @@
       if (late) nodes.push(h('p', { class: 'stale', role: 'status' }, '업데이트가 조금 늦어지고 있어요. 새 이슈가 올라오면 바로 보여드릴게요.'));
       nodes.push(myCatsRow(fv.days));
       if (fv.secs.some((s) => s.cards.length)) {
-        fv.secs.forEach((s) => nodes.push(sectionNode(s, fv.days)));
+        const lim = sectionLimit(fv.secs.filter((x) => x.id).length);
+        fv.secs.forEach((s) => nodes.push(sectionNode(s, fv.days, lim)));
       } else if (!fv.all.length) {
         // 보여줄 기간 안의 이슈가 하나도 없어요 (갱신이 며칠 멈춘 경우). 기간 밖의 이슈를 대신 보여주지 않아요
         nodes.push(
