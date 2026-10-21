@@ -41,9 +41,9 @@ const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 // 분야를 적게 고를수록 화면에 보이는 양이 비슷하도록 더 오래된 이슈까지 보여주고, 분야를 딱 1개만 고르면 그 분야의 이슈를 모두 보여줘요 (site/js/app.js 의 windowDays).
 // 그래서 분야마다 하루 1~2개씩 꾸준히 쌓여야 해요.
 const MIN_CARDS_PER_DAY = 7;
-const MAX_CARDS_PER_DAY = 26; // 2026-10-21: 하루 두 번(05:50 아침 + 12:50 점심 추가) 올리며 분야당 하루 3개쯤을 목표로 14 → 26
+const MAX_CARDS_PER_DAY = 40; // 2026-10-21: 3시간마다(05:50 아침 + 08:50·11:50·14:50·17:50·20:50 추가) 올려서 14 → 26 → 40
 const MIN_GROUPS_PER_DAY = 5; // 하루 카드가 걸쳐야 하는 서로 다른 분야 수
-const MAX_PER_GROUP_PER_DAY = 4; // 한 분야가 하루 카드를 독차지하지 않게
+const MAX_PER_GROUP_PER_DAY = 6; // 한 분야가 하루 카드를 독차지하지 않게 (2026-10-21 하루 6번 실행으로 4 → 6)
 const RECENT_DAYS = 3; // 모든 분야를 골랐을 때 앱이 보여주는 기간 (오늘 포함 3일 = 오늘 기준 2일 전까지). 앱 화면(site/js/app.js 의 FEED_DAYS)과 같은 값이에요
 const ARCHIVE_MAX_PER_GROUP = 300; // 지난 이슈 보관함(archive.json)에 분야마다 담는 최대 개수(가장 최근 것부터). 하루 1개쯤 쌓이니 약 1년치예요. 넘치면 오래된 것부터 빠져요(사전 terms.json 에는 남아요)
 const FEED_MIN_PER_GROUP = 2; // 분야마다 최근 RECENT_DAYS 일 안에 이만큼은 있어야 해요 (모자라면 validate 가 알려줘요)
