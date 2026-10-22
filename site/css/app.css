@@ -222,6 +222,7 @@ a { color: inherit; }
 .gtitle .gdot { width: 14px; height: 14px; margin: 0 10px 0 0; vertical-align: 0; }
 .gtitle + .secnone, .gtitle + .box { margin-top: 18px; }
 .ctop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dtop { display: flex; align-items: center; justify-content: space-between; gap: 8px; } /* 해설 화면 위: 분류 + 날짜 */
 .dtag { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .dtag.now { padding: 1px 8px; border-radius: 999px; background: var(--lime); color: var(--ink); font-weight: 700; }
 .tg .dtag { margin-left: 8px; }

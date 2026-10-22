@@ -528,7 +528,7 @@
         'ol',
         { class: 'flow' },
         ...c.updates.map((u, i) =>
-          h('li', { class: i === last ? 'now' : null }, h('span', { class: 'fd' }, mdText(u.date), i === last ? h('span', { class: 'fnow' }, '지금') : null), h('span', { class: 'fl' }, u.line))
+          h('li', { class: i === last ? 'now' : null }, h('span', { class: 'fd' }, mdText(u.date), i === last ? h('span', { class: 'fnow' }, u.date === todayYmd() ? '지금' : '최신') : null), h('span', { class: 'fl' }, u.line))
         )
       )
     );
@@ -1419,7 +1419,8 @@
         h('button', { class: 'back', type: 'button', onclick: backToList }, icon('left', 22), '뒤로'),
         h('button', { class: 'iconbtn', type: 'button', 'aria-label': '공유', onclick: () => shareCard(c) }, icon('share', 22))
       ),
-      catPill(c),
+      // 해설 날짜를 위쪽에 보여줘요 (2026-10-22: 어제 소식이 오늘 것처럼 읽히지 않게)
+      h('div', { class: 'dtop' }, catPill(c), dayTag(c.date)),
       h('h1', { class: 'dh1' }, h('span', { class: 'hl' }, c.keyword)),
       h('p', { class: 'dline' }, c.line),
       statLine(c),
