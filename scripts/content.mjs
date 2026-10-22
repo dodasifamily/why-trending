@@ -86,6 +86,8 @@ const NEWS_CHANNELS = [
   '서울경제TV', '14F 일사에프', '전자신문 etnews', '엠빅뉴스', 'Arirang News',
   // 지역 방송사 뉴스 채널(지역 행사·소식은 전국 방송보다 지역 방송사에 영상이 있는 경우가 많아요): 대전MBC 뉴스(대전MBC, 2026-10-18 추가)
   '대전MBC 뉴스',
+  // 2026-10-22 사용자 요청(영상이 붙은 카드가 너무 적어요): 자동 찾기에서 '허용 채널 아님'으로 떨어진 채널 가운데 언론사·방송사가 직접 운영하는 곳을 더했어요
+  '한국경제TV', '이데일리TV', '매일경제TV', '조선일보', '중앙일보', '동아일보', '한겨레', '경향신문', '광주MBC뉴스', 'TJB NEWS',
   'ABC News', 'Bloomberg Television', 'CNBC Television', 'Reuters', 'BBC News', 'CNN', 'Associated Press', 'NBC News', 'CBS News', 'Sky News'
 ];
 // 제목에 이런 말이 있으면 반응 영상·모음·자극적인 영상일 가능성이 커서 쓰지 않아요.
@@ -115,6 +117,15 @@ function normName(s) {
   return String(s || '').normalize('NFKC').toLowerCase().replace(/[\s·・\-_.'’"]/g, '');
 }
 const NEWS_CHANNEL_KEYS = new Set(NEWS_CHANNELS.map(normName));
+// 영상 자동 찾기가 'official'(당사자·권리를 가진 곳의 공식 채널)로 붙여도 되는 채널 (2026-10-22). 리그·대회 주최와 중계권사, 소속사·배급사, 기업 공식 채널이에요.
+// 이름이 정확히 같아야 해요(대소문자·띄어쓰기 무시). 직접 찾아 붙이는 media 의 official 은 이 목록과 상관없이 담당이 확인해서 써요.
+const OFFICIAL_CHANNELS = [
+  'KBO', 'TVING SPORTS', '쿠팡플레이 스포츠', 'K LEAGUE', 'LCK', 'LoL Esports', 'SOOP esports EN',
+  'JYP Entertainment', 'SMTOWN', 'HYBE LABELS', 'STARSHIP', 'YG ENTERTAINMENT', '1theK (원더케이)', 'Stone Music Entertainment',
+  'CJ ENM Movie', 'tvN DRAMA', 'TVING 티빙', 'Netflix Korea 넷플릭스 코리아', 'MBCentertainment', 'SBS Entertainment',
+  'Apple', 'Samsung', 'Google', 'Tesla'
+];
+const OFFICIAL_CHANNEL_KEYS = new Set(OFFICIAL_CHANNELS.map(normName));
 
 // 다루지 않기로 한 주제의 단서가 되는 말들이에요. 걸리면 그 카드는 빼거나 다시 써야 해요.
 // 2026-10-19 '화제 이슈 중심' 개편: 큰 시위·집회·파업(국내외)은 사실만 전하는 조건으로 다루기로 해서 '시위'·'집회'·'파업'은 뺐어요.
@@ -975,7 +986,7 @@ async function verifyMedia() {
 //    유튜브 API 이용약관(받아 둔 정보는 30일 안에 새로 받거나 지우기)에 맞게 기록은 FIND_KEEP_DAYS 일만 써요.
 //  - 키(YOUTUBE_API_KEY)가 없거나 오류가 나면 건너뛰어요(사이트는 그대로 올라가요). 키는 로그에 찍지 않아요.
 const YT_API_URL = (process.env.YT_API_URL || 'https://www.googleapis.com/youtube/v3').replace(/\/+$/, '');
-const FIND_MAX_SEARCHES = Number(process.env.FIND_VIDEOS_MAX_SEARCHES) > 0 ? Number(process.env.FIND_VIDEOS_MAX_SEARCHES) : 12;
+const FIND_MAX_SEARCHES = Number(process.env.FIND_VIDEOS_MAX_SEARCHES) > 0 ? Number(process.env.FIND_VIDEOS_MAX_SEARCHES) : 18; // 2026-10-22: 카드가 늘어서 12 → 18 (하루 100번 한도는 그대로라 넘으면 다음 날 찾아요)
 const FIND_RETRY_HOURS = 6; // 못 찾은 카드는 이만큼 지나야 다시 검색해요
 const FIND_KEEP_DAYS = 14; // 찾은 영상 기록을 쓰는 기간
 const FIND_NEWS_DAYS_BEFORE = 7; // 뉴스 영상은 카드 날짜보다 이만큼 앞서 올라온 것부터
@@ -1064,10 +1075,20 @@ function keywordFit(card, title, mode) {
   const tokens = String(card.keyword).split(/\s+/).map(textKey).filter((t) => t.length >= 2);
   if (!tokens.length) return tk.includes(full) ? 1 : 0;
   const longest = tokens.reduce((a, b) => (b.length > a.length ? b : a));
-  if (!tk.includes(longest)) return 0;
   const hit = tokens.filter((t) => tk.includes(t)).length;
-  const need = tokens.length <= 2 ? tokens.length : Math.ceil((tokens.length * 2) / 3);
-  return hit >= need ? hit / tokens.length : 0;
+  const need = tokens.length <= 2 ? tokens.length : Math.max(2, Math.ceil(tokens.length / 2)); // 2026-10-22: 2/3 → 절반(최소 2개)
+  if (tk.includes(longest) && hit >= need) return hit / tokens.length;
+  // 2026-10-22: 뉴스 제목은 카드 키워드와 다른 말로 쓰는 일이 많아요(예: '루이바오 후이바오 중국행' ↔ '쌍둥이 판다 오는 12월 중국행').
+  // 키워드 말 1개 이상 + 카드 한 줄 요약(line)의 이름·명사 말까지 합쳐 서로 다른 말 3개 이상이 제목에 있으면 맞는 영상으로 봐요 (날짜 범위·허용 채널 조건은 그대로).
+  if (!hit) return 0;
+  const lineTokens = String(card.line || '')
+    .replace(/[^0-9A-Za-z가-힣\s]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => !/요$/.test(t)) // '올렸어요' 같은 서술어는 빼요
+    .map((t) => textKey(t).replace(/(에서|으로|까지|부터|이|가|은|는|을|를|의|에|로|와|과|도|만)$/, '')) // 붙은 조사를 떼요 ('후이바오가' → '후이바오')
+    .filter((t) => t.length >= 2 && !/^\d+$/.test(t));
+  const extra = [...new Set(lineTokens)].filter((t) => !tokens.includes(t) && tk.includes(t)).length;
+  return hit + extra >= 3 ? Math.min(0.6, (hit + extra) / (tokens.length + 3)) : 0;
 }
 
 // videos.list 가 돌려준 영상 하나가 이 카드에 붙여도 되는지 따져요. 되면 { v }, 안 되면 { why }
@@ -1083,7 +1104,8 @@ function evaluateVideo(it, card, mode) {
   if (!channel || !title) return { why: '제목·채널 없음' };
   if (channel.length > VIDEO_CHANNEL_MAX) return { why: '채널 이름이 너무 길어요' };
   if (VIDEO_BLOCK_CHANNELS.some((x) => normName(x) === normName(channel))) return { why: '막아 둔 채널' };
-  if (mode === 'news' && !NEWS_CHANNEL_KEYS.has(normName(channel))) return { why: '허용 채널 아님' };
+  const official = mode === 'news' && OFFICIAL_CHANNEL_KEYS.has(normName(channel));
+  if (mode === 'news' && !official && !NEWS_CHANNEL_KEYS.has(normName(channel))) return { why: '허용 채널 아님' };
   if (sn.liveBroadcastContent && sn.liveBroadcastContent !== 'none') return { why: '생중계' };
   if (st.privacyStatus !== 'public' || st.embeddable !== true) return { why: '재생 허용 안 됨' };
   if (st.madeForKids === true) return { why: '아이용 영상' };
@@ -1109,7 +1131,7 @@ function evaluateVideo(it, card, mode) {
     const around = [title, channel, ...(Array.isArray(sn.tags) ? sn.tags : []), String(sn.description || '').slice(0, 400)].join(' ');
     if (CLIP_TITLE_BLOCKED.test(around)) return { why: '아이(미성년자) 단서' };
   }
-  return { v: { id, channel, title: title.slice(0, VIDEO_TITLE_MAX), published, views: Number.isFinite(views) ? Math.floor(views) : 0, fit } };
+  return { v: { id, channel, title: title.slice(0, VIDEO_TITLE_MAX), published, views: Number.isFinite(views) ? Math.floor(views) : 0, fit, official } };
 }
 
 // 통과한 영상 가운데 카드에 붙일 것을 골라요. 뉴스는 1개(media), 밈은 조회수 순 CLIP_MAX 개(clips, 채널이 겹치지 않게 먼저)
@@ -1117,7 +1139,7 @@ function chooseVideos(passed, mode) {
   if (!passed.length) return null;
   if (mode === 'news') {
     const best = [...passed].sort((a, b) => b.fit - a.fit || b.views - a.views || b.published - a.published)[0];
-    return { media: { type: 'video', provider: 'youtube', id: best.id, kind: 'news', channel: best.channel, title: best.title }, info: [best] };
+    return { media: { type: 'video', provider: 'youtube', id: best.id, kind: best.official ? 'official' : 'news', channel: best.channel, title: best.title }, info: [best] };
   }
   const sorted = [...passed].sort((a, b) => b.views - a.views);
   const out = [];
