@@ -161,6 +161,12 @@ const TONE_WORDS = {
 // 이슈 이어보기 (2026-10-21, 사용자 요청): 같은 이슈를 새 사실로 다시 올리면(같은 id, 더 늦은 date) merge 가
 // 처음 보도일(firstDate)과 날짜별 한 줄 기록(updates: [{date, line}], 오래된 것부터, 마지막은 지금 카드)을 이어 붙여요.
 // 앱은 'N일째 이어지는 이슈' 배지와 해설 화면의 '이슈 흐름'으로 보여줘요. 카드에 직접 쓰지 않아도 돼요(merge 가 만들어요).
+const SOURCE_ROLES = ['primary', 'report', 'cross'];
+const SOURCE_NOTE_MAX = 80;
+// 숫자 카드 (2026-10-22 사용자 요청: 영상·이미지가 없는 카드가 많아요). 기사 사진 대신 앱이 직접 그리는 '핵심 숫자' 그래픽이에요.
+// stat = { value: '5,552.74', label: '코스피 20일 종가', change: '-3.73%', dir: 'down' } (change·dir 은 선택).
+// 숫자를 지어내지 않게, value·change 의 숫자는 모두 카드 글(line·meaning·why)에 그대로 있어야 해요.
+const STAT_DIRS = ['up', 'down', 'flat'];
 const UPDATES_MAX = 8; // 기록이 넘치면 처음 것 1개와 최근 것들만 남겨요
 const UPDATE_LINE_MAX = 60;
 
@@ -297,6 +303,24 @@ function validateCard(card, where) {
   if (!Array.isArray(card.sources) || card.sources.length < 2) {
     err(where, 'sources 는 2곳 이상이어야 해요');
   } else {
+    // 단계별 출처 (2026-10-22 사용자 요청): role = primary(1차 자료: 정부·기관 발표, 공시, 기업·단체 공식 발표, 공식 기록) /
+    // report(원 보도: 이 소식을 처음·가장 자세히 전한 기사) / cross(교차 확인: 같은 사실을 따로 확인한 다른 매체 기사).
+    // note = 그 출처로 확인한 내용 한 줄. 쓰려면 모든 출처에 role 을 달고, 원 보도가 1개 이상이어야 해요.
+    // 1차 자료는 언론사 2곳 조건에 들어가지 않아요(언론사 기사 2곳은 그대로 필요해요).
+    const roles = card.sources.map((s) => (s && typeof s === 'object' ? s.role : undefined));
+    const withRole = roles.filter((r) => r !== undefined).length;
+    if (withRole && withRole !== card.sources.length) err(where, 'role 은 모든 출처에 달거나 모두 빼야 해요');
+    if (withRole) {
+      roles.forEach((r, i) => { if (r !== undefined && !SOURCE_ROLES.includes(r)) err(`${where}.sources[${i}]`, `role 은 ${SOURCE_ROLES.join(' / ')} 중 하나여야 해요`); });
+      if (!roles.includes('report')) err(where, "role 'report'(원 보도) 출처가 1개 이상 있어야 해요");
+      const press = new Set(card.sources.filter((s) => s && s.role !== 'primary' && typeof s.name === 'string').map((s) => s.name.trim()));
+      if (press.size < 2) err(where, '1차 자료를 빼고도 서로 다른 언론사 기사가 2곳 이상이어야 해요');
+    }
+    card.sources.forEach((s, i) => {
+      if (!s || typeof s !== 'object' || s.note === undefined) return;
+      checkString(`${where}.sources[${i}]`, 'note', s.note, 6, SOURCE_NOTE_MAX);
+      if (typeof s.note === 'string') { scanBlocked(`${where}.sources[${i}]`, 'note', s.note); scanTone(`${where}.sources[${i}]`, 'note', s.note); }
+    });
     const names = new Set();
     const urls = new Set();
     card.sources.forEach((s, i) => {
@@ -337,11 +361,42 @@ function validateCard(card, where) {
   }
 
   validateHistory(card, where);
+  validateStat(card, where);
   checkDirection(card, where);
   validatePolicy(card, where);
   validateMedia(card, where);
   validateClips(card, where);
   validateScene(card, where);
+}
+
+function validateStat(card, where) {
+  if (card.stat === undefined) return;
+  const st = card.stat;
+  const w = `${where}.stat`;
+  if (!st || typeof st !== 'object' || Array.isArray(st)) return err(w, 'stat 은 { value, label, change?, dir? } 모양이어야 해요');
+  for (const k of Object.keys(st)) if (!['value', 'label', 'change', 'dir'].includes(k)) err(w, `stat 에는 ${k} 를 쓰지 않아요`);
+  checkString(w, 'value', st.value, 1, 16);
+  checkString(w, 'label', st.label, 2, 24);
+  if (typeof st.value === 'string' && !/^[+\-−]?[0-9][0-9,.:~ ]*(?:[가-힣A-Za-z%$]{1,4}(?: [가-힣A-Za-z]{1,3})?)?$/.test(st.value)) err(w, `value 는 숫자로 시작하는 짧은 값이어야 해요 (예: 5,552.74 / 13 : 1 / 616억 달러): ${st.value}`);
+  if (st.change !== undefined) {
+    checkString(w, 'change', st.change, 1, 12);
+    if (typeof st.change === 'string' && !/^[+\-−▲▼]?[0-9][0-9,.]*\s?(?:%p?|원|배|명|개|위|bp)?$/.test(st.change)) err(w, `change 는 +3.2% / -3.73% / ▲12원 같은 모양이어야 해요: ${st.change}`);
+  }
+  if (st.dir !== undefined && !STAT_DIRS.includes(st.dir)) err(w, `dir 은 ${STAT_DIRS.join(' / ')} 중 하나여야 해요`);
+  if (typeof st.change === 'string' && st.dir) {
+    const down = /^[-−▼]/.test(st.change);
+    const up = /^[+▲]/.test(st.change);
+    if ((down && st.dir === 'up') || (up && st.dir === 'down')) err(w, `change(${st.change}) 와 dir(${st.dir}) 의 방향이 달라요`);
+  }
+  if (typeof st.label === 'string') { scanBlocked(w, 'label', st.label); scanTone(w, 'label', st.label); }
+  // 숫자를 지어내지 않게: value·change 의 숫자 덩어리는 모두 카드 글에 그대로 있어야 해요 (쉼표는 무시)
+  const body = [card.line, card.meaning, ...(Array.isArray(card.why) ? card.why : [])].filter((t) => typeof t === 'string').join(' ').replace(/,/g, '');
+  for (const f of ['value', 'change']) {
+    if (typeof st[f] !== 'string') continue;
+    for (const n of st[f].replace(/,/g, '').match(/[0-9]+(?:\.[0-9]+)?/g) || []) {
+      if (!new RegExp(`(?<![0-9.])${n.replace('.', '\\.')}(?![0-9])`).test(body)) err(w, `${f} 의 숫자 '${n}' 이 카드 글(line·meaning·why)에 없어요. 기사에서 확인해 글에 쓴 숫자만 그래픽에 써요`);
+    }
+  }
 }
 
 // 이슈 이어보기 기록: firstDate 와 updates 는 함께 있거나 함께 없어야 해요 (merge 가 만들어요).
@@ -556,7 +611,7 @@ function daysBetween(a, b) {
 function freshnessProblems(card) {
   if (!card || typeof card !== 'object' || !isRealDate(card.date) || !Array.isArray(card.sources)) return [];
   const items = card.sources
-    .filter((s) => s && typeof s === 'object' && isRealDate(s.published))
+    .filter((s) => s && typeof s === 'object' && s.role !== 'primary' && isRealDate(s.published)) // 1차 자료(공식 발표·공시)는 신선도 계산에서 빼요
     .map((s) => ({ name: String(s.name || '').trim(), published: s.published, age: daysBetween(s.published, card.date) }));
   if (!items.length) return [];
   const meme = card.group === 'meme';

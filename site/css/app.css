@@ -429,6 +429,20 @@ a { color: inherit; }
   letter-spacing: -0.02em;
 }
 .art .ar { font-size: 0.42em; font-weight: 700; opacity: 0.85; }
+/* 숫자 카드 (0.4.6): 기사 사진 대신 앱이 직접 그리는 핵심 숫자 */
+.art.stat { height: auto; min-height: 132px; padding: 18px 20px; justify-content: flex-start; }
+.statbox { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.statbox .sl { font-size: 14px; font-weight: 700; opacity: 0.92; }
+.statbox .sv { font-family: var(--display); font-size: 44px; line-height: 1.1; letter-spacing: -0.5px; overflow-wrap: anywhere; }
+.schg { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; background: #fff; font-size: 14px; font-weight: 700; line-height: 1.4; white-space: nowrap; }
+.schg.up { color: #D6293E; }   /* 한국 관례: 오름은 빨강 */
+.schg.down { color: #1C64D6; } /* 내림은 파랑 */
+.schg.flat { color: var(--ink); }
+.statline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 14px 0 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.statline .sl { font-size: 13px; font-weight: 700; color: var(--muted); }
+.statline .sv { font-size: 18px; font-weight: 800; color: var(--ink); }
+.statline .schg { border: 1px solid var(--line); font-size: 13px; padding: 1px 8px; }
+@media (max-width: 359px) { .statbox .sv { font-size: 36px; } }
 .sec { margin-top: 28px; }
 .sec h2 { margin: 0; font-size: 13px; font-weight: 700; color: var(--muted); }
 .sec p { margin: 8px 0 0; font-size: 15px; line-height: 1.65; }
@@ -501,6 +515,14 @@ a { color: inherit; }
 }
 .srcs .sn { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .srcs .st { display: block; margin-top: 2px; font-size: 14px; line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; }
+/* 단계별 출처 (0.4.6) */
+.srcs .snote { display: block; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); font-size: 13px; line-height: 1.55; color: var(--body); }
+.srcs .snote b { color: var(--muted); font-weight: 700; }
+.srcsteps { display: flex; flex-direction: column; gap: 14px; margin-top: 10px; }
+.srch { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.srcl { display: inline-flex; padding: 1px 9px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 700; }
+.srchint { font-size: 12px; color: var(--muted); }
+.srcstep .srcs { margin-top: 6px; }
 .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 28px; }
 
 /* ---------- 검색 ---------- */

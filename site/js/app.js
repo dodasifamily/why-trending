@@ -1114,10 +1114,41 @@
     return list.some((x) => SCENE_EMOJI.test(x)) ? list : null;
   }
 
+  // ---------- 숫자 카드 (0.4.6) ----------
+  // 기사 사진 대신 앱이 직접 그리는 '핵심 숫자' 그래픽이에요. 숫자는 카드 글에 있는 것만 쓰도록 검사가 막아요(scripts/content.mjs validateStat).
+  function statOf(c) {
+    const st = c && c.stat;
+    if (!st || typeof st !== 'object' || typeof st.value !== 'string' || typeof st.label !== 'string') return null;
+    if (!st.value.trim() || st.value.length > 16 || !st.label.trim() || st.label.length > 24) return null;
+    const change = typeof st.change === 'string' && st.change.length <= 12 ? st.change : '';
+    const dir = st.dir === 'up' || st.dir === 'down' || st.dir === 'flat' ? st.dir : /^[-−▼]/.test(change) ? 'down' : /^[+▲]/.test(change) ? 'up' : '';
+    return { value: st.value, label: st.label, change, dir };
+  }
+  function statChip(st) {
+    if (!st.change) return null;
+    const mark = st.dir === 'up' ? '▲' : st.dir === 'down' ? '▼' : '';
+    const text = st.change.replace(/^[+\-−▲▼]/, '');
+    return h('span', { class: 'schg ' + (st.dir || 'flat') }, mark ? mark + ' ' + text : st.change);
+  }
+  /** 영상이 있는 카드: 해설 위 한 줄 아래에 작은 숫자 상자 */
+  function statLine(c) {
+    const st = statOf(c);
+    if (!st || !heroVideo(c)) return null;
+    return h('div', { class: 'statline', role: 'img', 'aria-label': `${st.label} ${st.value} ${st.change}` }, h('span', { class: 'sl' }, st.label), h('span', { class: 'sv' }, st.value), statChip(st));
+  }
+
   function artBlock(c) {
     const g = groupOf(c.group);
     const col = groupColors(g);
     const style = `--a1:${col.a1};--a2:${col.a2};color:${col.ink}`;
+    const st = statOf(c);
+    if (st) {
+      return h(
+        'div',
+        { class: 'art stat', style, role: 'img', 'aria-label': `${st.label} ${st.value} ${st.change}` },
+        h('div', { class: 'statbox' }, h('span', { class: 'sl' }, st.label), h('span', { class: 'sv' }, st.value), statChip(st))
+      );
+    }
     const scene = sceneOf(c);
     if (!scene) return h('div', { class: 'art', style, 'aria-hidden': 'true' }, icon(g.icon, 64));
     const cells = [];
@@ -1318,22 +1349,35 @@
     return rest.length ? section('많이 본 관련 영상', rest.map(videoFigure)) : null;
   }
 
-  function sourceList(c) {
+  // 단계별 출처 (0.4.6): 출처에 role(primary 1차 자료 · report 원 보도 · cross 교차 확인)이 있으면 단계별로 묶고, note(확인한 내용)를 함께 보여줘요
+  const SOURCE_STEPS = [
+    ['primary', '1차 자료', '공식 발표·공시처럼 소식의 바탕이 되는 자료'],
+    ['report', '원 보도', '이 소식을 전한 기사'],
+    ['cross', '교차 확인', '같은 사실을 따로 확인한 다른 매체 기사']
+  ];
+  function sourceItem(s) {
     return h(
-      'ul',
-      { class: 'srcs' },
-      c.sources.map((s) =>
-        h(
-          'li',
-          null,
-          h(
-            'a',
-            { href: s.url, target: '_blank', rel: 'noopener noreferrer' },
-            h('span', { class: 'sn' }, `${s.name} · ${dotDate(s.published)}`, icon('out', 14)),
-            h('span', { class: 'st' }, s.title)
-          )
-        )
+      'li',
+      null,
+      h(
+        'a',
+        { href: s.url, target: '_blank', rel: 'noopener noreferrer' },
+        h('span', { class: 'sn' }, `${s.name} · ${dotDate(s.published)}`, icon('out', 14)),
+        h('span', { class: 'st' }, s.title),
+        typeof s.note === 'string' && s.note.trim() ? h('span', { class: 'snote' }, h('b', null, '확인한 내용 '), s.note) : null
       )
+    );
+  }
+  function sourceList(c) {
+    const staged = c.sources.length && c.sources.every((s) => SOURCE_STEPS.some(([k]) => k === s.role));
+    if (!staged) return h('ul', { class: 'srcs' }, c.sources.map(sourceItem));
+    return h(
+      'div',
+      { class: 'srcsteps' },
+      SOURCE_STEPS.map(([k, label, hint]) => {
+        const list = c.sources.filter((s) => s.role === k);
+        return list.length ? h('div', { class: 'srcstep' }, h('div', { class: 'srch' }, h('span', { class: 'srcl' }, label), h('span', { class: 'srchint' }, hint)), h('ul', { class: 'srcs' }, list.map(sourceItem))) : null;
+      })
     );
   }
 
@@ -1378,6 +1422,7 @@
       catPill(c),
       h('h1', { class: 'dh1' }, h('span', { class: 'hl' }, c.keyword)),
       h('p', { class: 'dline' }, c.line),
+      statLine(c),
       // 3일이 지난 해설(분야를 적게 골라 지난 이슈까지 보거나, 링크·검색으로 연 경우): 열어 주되 지난 소식이라고 알려줘요
       daysApart(c.date, todayYmd()) >= FEED_DAYS ? h('p', { class: 'stale', role: 'status' }, `${daysApart(c.date, todayYmd())}일 전 소식이에요. 지금은 내용이 달라졌을 수 있어요.`) : null,
       mediaBlock(c),
