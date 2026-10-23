@@ -1386,10 +1386,14 @@
   }
 
   let navigatedInApp = false; // 앱 안에서 화면을 한 번이라도 앞으로 넘겼는지
+  let openedFromPush = false; // 지금 화면을 알림을 눌러 열었는지 (그러면 '뒤로'는 오늘 화면으로)
   function backToList() {
-    // 해설·분야 전체 보기를 연 화면(오늘/검색/분야 전체 보기)으로 돌아가요. 링크로 바로 들어왔다면 오늘 화면으로 가요.
-    if (navigatedInApp) history.back();
-    else go('/', true);
+    // 해설·분야 전체 보기를 연 화면(오늘/검색/분야 전체 보기)으로 돌아가요. 링크나 알림으로 바로 들어왔다면 오늘 화면으로 가요.
+    if (navigatedInApp && !openedFromPush) history.back();
+    else {
+      openedFromPush = false;
+      go('/', true);
+    }
   }
 
   function renderDetail(id, keepScroll) {
@@ -1668,7 +1672,10 @@
     FM.addListener('notificationActionPerformed', (ev) => {
       const data = ev && ev.notification && ev.notification.data;
       const r = data && typeof data.route === 'string' ? data.route : '';
-      go(/^\/t\/[A-Za-z0-9._~%-]{1,90}$/.test(r) ? r : '/');
+      // 2026-10-23: 알림으로 연 해설에서 '뒤로'가 안 되는 일이 있었어요(알림으로 앱이 켜지면 돌아갈 앞 화면이 없어요).
+      // 그래서 기록을 더하지 않고(replace) 열고, 뒤로는 늘 오늘 화면으로 가게 표시해 둬요.
+      openedFromPush = true;
+      go(/^\/t\/[A-Za-z0-9._~%-]{1,90}$/.test(r) ? r : '/', true);
     });
   }
 
@@ -1874,6 +1881,7 @@
     });
     window.addEventListener('hashchange', () => {
       navigatedInApp = true;
+      openedFromPush = false; // 알림으로 연 해설에서 다른 화면으로 넘어가면 그때부터는 보통 '뒤로'예요
       route();
     });
     document.addEventListener('visibilitychange', () => {
