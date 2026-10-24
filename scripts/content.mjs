@@ -90,6 +90,8 @@ const NEWS_CHANNELS = [
   '한국경제TV', '이데일리TV', '매일경제TV', '조선일보', '중앙일보', '동아일보', '한겨레', '경향신문', '광주MBC뉴스', 'TJB NEWS',
   // 2026-10-24 점검: 연합뉴스경제TV(연합인포맥스 운영, 기자협회보 확인)
   '연합뉴스경제TV',
+  // 2026-10-24 사용자 확인으로 추가: 지역·경제 방송사 뉴스 채널
+  'KBC 뉴스', 'SBS Biz 뉴스', 'KBS NEWS 전남광주', '광주MBC',
   'ABC News', 'Bloomberg Television', 'CNBC Television', 'Reuters', 'BBC News', 'CNN', 'Associated Press', 'NBC News', 'CBS News', 'Sky News'
 ];
 // 제목에 이런 말이 있으면 반응 영상·모음·자극적인 영상일 가능성이 커서 쓰지 않아요.
@@ -127,7 +129,9 @@ const OFFICIAL_CHANNELS = [
   'CJ ENM Movie', 'tvN DRAMA', 'TVING 티빙', 'Netflix Korea 넷플릭스 코리아', 'MBCentertainment', 'SBS Entertainment',
   'Apple', 'Samsung', 'Google', 'Tesla',
   // 2026-10-24 점검: NMIXX(JYP 소속 그룹 공식 채널), 충청남도(Chungnam) 충남TV(충청남도 공식 채널 — 도가 여는 행사·축제 소식용)
-  'NMIXX', '충청남도(Chungnam) 충남TV'
+  'NMIXX', '충청남도(Chungnam) 충남TV',
+  // 2026-10-24 사용자 확인으로 추가: 가수 크러쉬 공식 채널
+  'Crush'
 ];
 const OFFICIAL_CHANNEL_KEYS = new Set(OFFICIAL_CHANNELS.map(normName));
 
