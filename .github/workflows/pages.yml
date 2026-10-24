@@ -16,6 +16,14 @@ on:
         description: '영상을 못 찾았던 카드도 6시간을 기다리지 않고 바로 다시 찾아요 (유튜브 검색 한도를 써요)'
         type: boolean
         default: false
+      video_days:
+        description: '최근 3일 밖의 지난 카드도 오늘 기준 며칠 안까지 영상을 찾을지 (0 이면 최근 3일만, 최대 30)'
+        required: false
+        default: '0'
+      max_searches:
+        description: '이번 실행에서 쓸 유튜브 검색 횟수 (비우면 18, 하루 100번 한도 안에서)'
+        required: false
+        default: ''
   # 매일 한국 시간 06:30 (해설 갱신 40분 뒤)에 한 번 더 올려요. 갱신 때 올리기를 놓쳤거나,
   # Pages 를 나중에 켠 경우에도 하루 안에 저절로 사이트가 올라가요.
   schedule:
@@ -70,6 +78,8 @@ jobs:
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           FIND_VIDEOS_RETRY: ${{ inputs.retry_videos && '1' || '' }}
+          FIND_VIDEOS_DAYS: ${{ inputs.video_days || '0' }}
+          FIND_VIDEOS_MAX_SEARCHES: ${{ inputs.max_searches || '' }}
         run: node scripts/content.mjs find-videos --write
 
       - name: 영상 찾기 기록 저장

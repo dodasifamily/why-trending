@@ -710,6 +710,10 @@ function validateTerms(terms, today) {
   }
 }
 
+function kstToday() {
+  return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
 function shiftDate(ymd, days) {
   const [y, m, d] = ymd.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d + days));
@@ -1308,6 +1312,22 @@ async function findVideos() {
   const source = files.find((f) => f.path === RECENT_PATH) || files.find((f) => f.path === TODAY_PATH);
   if (!source) return console.log('ℹ️ 카드 목록 파일이 없어서 영상 자동 찾기를 건너뛰었어요');
   const cards = (source.list(source.json) || []).filter((c) => c && typeof c.id === 'string' && typeof c.keyword === 'string' && isRealDate(c.date) && needsVideo(c));
+  // 2026-10-24 사용자 요청(허용 채널을 넓힌 뒤 기존 카드에도 다시 찾아 붙이기): FIND_VIDEOS_DAYS=N 이면 최근 3일 밖이라도
+  // 지난 이슈 보관함에서 오늘 기준 N일 안의 영상 없는 카드까지 찾아요(직접 누른 실행에서만 쓰고, 예약 실행은 0 이라 최근 3일만이에요).
+  const extraDays = Math.max(0, Math.min(30, Number(process.env.FIND_VIDEOS_DAYS) || 0));
+  if (extraDays) {
+    const arch = files.find((f) => f.path === ARCHIVE_PATH);
+    const newest = cards.reduce((m, c) => (c.date > m ? c.date : m), '') || kstToday();
+    const from = shiftDate(newest, -(extraDays - 1));
+    const have = new Set(cards.map((c) => c.id));
+    for (const c of arch ? arch.list(arch.json) || [] : []) {
+      if (c && typeof c.id === 'string' && typeof c.keyword === 'string' && isRealDate(c.date) && c.date >= from && !have.has(c.id) && needsVideo(c)) {
+        cards.push(c);
+        have.add(c.id);
+      }
+    }
+    console.log(`ℹ️ 지난 이슈 보관함에서 ${from} 이후 카드까지 찾아요 (영상 없는 카드 모두 ${cards.length}개)`);
+  }
 
   const cachePath = resolve(argValue('--cache') || '.cache/video-picks.json');
   let cache = { v: 1, cards: {} };
