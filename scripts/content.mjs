@@ -88,6 +88,8 @@ const NEWS_CHANNELS = [
   '대전MBC 뉴스',
   // 2026-10-22 사용자 요청(영상이 붙은 카드가 너무 적어요): 자동 찾기에서 '허용 채널 아님'으로 떨어진 채널 가운데 언론사·방송사가 직접 운영하는 곳을 더했어요
   '한국경제TV', '이데일리TV', '매일경제TV', '조선일보', '중앙일보', '동아일보', '한겨레', '경향신문', '광주MBC뉴스', 'TJB NEWS',
+  // 2026-10-24 점검: 연합뉴스경제TV(연합인포맥스 운영, 기자협회보 확인)
+  '연합뉴스경제TV',
   'ABC News', 'Bloomberg Television', 'CNBC Television', 'Reuters', 'BBC News', 'CNN', 'Associated Press', 'NBC News', 'CBS News', 'Sky News'
 ];
 // 제목에 이런 말이 있으면 반응 영상·모음·자극적인 영상일 가능성이 커서 쓰지 않아요.
@@ -123,7 +125,9 @@ const OFFICIAL_CHANNELS = [
   'KBO', 'TVING SPORTS', '쿠팡플레이 스포츠', 'K LEAGUE', 'LCK', 'LoL Esports', 'SOOP esports EN',
   'JYP Entertainment', 'SMTOWN', 'HYBE LABELS', 'STARSHIP', 'YG ENTERTAINMENT', '1theK (원더케이)', 'Stone Music Entertainment',
   'CJ ENM Movie', 'tvN DRAMA', 'TVING 티빙', 'Netflix Korea 넷플릭스 코리아', 'MBCentertainment', 'SBS Entertainment',
-  'Apple', 'Samsung', 'Google', 'Tesla'
+  'Apple', 'Samsung', 'Google', 'Tesla',
+  // 2026-10-24 점검: NMIXX(JYP 소속 그룹 공식 채널), 충청남도(Chungnam) 충남TV(충청남도 공식 채널 — 도가 여는 행사·축제 소식용)
+  'NMIXX', '충청남도(Chungnam) 충남TV'
 ];
 const OFFICIAL_CHANNEL_KEYS = new Set(OFFICIAL_CHANNELS.map(normName));
 
