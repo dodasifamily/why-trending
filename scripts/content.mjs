@@ -93,6 +93,8 @@ const NEWS_CHANNELS = [
   // 2026-10-24 사용자 확인으로 추가: 지역·경제 방송사 뉴스 채널
   'KBC 뉴스', 'SBS Biz 뉴스', 'KBS NEWS 전남광주', '광주MBC',
   '대구MBC뉴스',
+  // 2026-10-26 주간 점검: 뉴스TVCHOSUN(TV조선), 스타뉴스 STARNEWS(머니투데이 계열 스타뉴스), kt HCN 핫콘뉴스(케이블 방송사 kt HCN 지역뉴스), iMBC연예(MBC 자회사 iMBC 연예뉴스)
+  '뉴스TVCHOSUN', '스타뉴스 STARNEWS', 'kt HCN 핫콘뉴스', 'iMBC연예',
   'ABC News', 'Bloomberg Television', 'CNBC Television', 'Reuters', 'BBC News', 'CNN', 'Associated Press', 'NBC News', 'CBS News', 'Sky News'
 ];
 // 제목에 이런 말이 있으면 반응 영상·모음·자극적인 영상일 가능성이 커서 쓰지 않아요.
@@ -132,7 +134,9 @@ const OFFICIAL_CHANNELS = [
   // 2026-10-24 점검: NMIXX(JYP 소속 그룹 공식 채널), 충청남도(Chungnam) 충남TV(충청남도 공식 채널 — 도가 여는 행사·축제 소식용)
   'NMIXX', '충청남도(Chungnam) 충남TV',
   // 2026-10-24 사용자 확인으로 추가: 가수 크러쉬 공식 채널
-  'Crush', 'BABYMONSTER'
+  'Crush', 'BABYMONSTER',
+  // 2026-10-26 주간 점검: JTBC Drama(JTBC 드라마 공식), MBCkpop(MBC 예능·음악 공식), SLL_official(드라마 제작사 SLL), SPOTV Golf(LPGA 국내 중계권사 SPOTV), 업비트 - Upbit Official(두나무 업비트)
+  'JTBC Drama', 'MBCkpop', 'SLL_official', 'SPOTV Golf', '업비트 - Upbit Official'
 ];
 const OFFICIAL_CHANNEL_KEYS = new Set(OFFICIAL_CHANNELS.map(normName));
 
