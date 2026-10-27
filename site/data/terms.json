@@ -1,7 +1,106 @@
 {
   "schema": 1,
-  "updatedAt": "2026-10-27T15:47:38+09:00",
+  "updatedAt": "2026-10-27T18:22:02+09:00",
   "terms": [
+    {
+      "id": "siri-ai-korean",
+      "date": "2026-10-27",
+      "group": "tech",
+      "cat": "AI",
+      "keyword": "시리 AI 한국어",
+      "line": "애플이 27일 업데이트로 '시리 AI'에 한국어를 더했어요",
+      "meaning": "애플의 새 AI 비서 '시리 AI'를 이제 한국어로 쓸 수 있어요. 27.2 소프트웨어 업데이트에 베타로 들어갔고, 메시지·메일 속 정보를 찾거나 화면에 보이는 내용으로 일정을 등록하는 등의 일을 해 줘요. 13세 미만은 쓸 수 없어요.",
+      "why": [
+        "애플은 26일 시리 AI를 한국어로 쓸 수 있다고 발표했고, 국내 이용자는 27일부터 베타로 쓸 수 있어요. 지디넷코리아와 이코노믹리뷰가 같은 날 다뤘어요.",
+        "애플에 따르면 이번 27.2 업데이트에서 한국어와 함께 프랑스어·일본어·포르투갈어·스페인어도 지원 언어에 들어갔어요.",
+        "지디넷코리아는 메시지 속 레시피를 찾아 미리알림 장보기 목록에 넣거나, 포스터를 찍으면 일정을 캘린더에 더하는 기능 등을 소개했어요.",
+        "이코노믹리뷰에 따르면 서버 모델을 쓰는 기능에는 하루 사용 한도가 있고, EU 지역 아이폰에서는 아직 쓸 수 없어요."
+      ],
+      "stat": {
+        "value": "27.2",
+        "label": "한국어가 들어간 업데이트"
+      },
+      "sources": [
+        {
+          "name": "Apple",
+          "title": "Siri AI, 오늘부터 한국어로 이용 가능",
+          "url": "https://apple.com/kr/newsroom/2026/10/siri-ai-is-available-today-in-more-languages",
+          "published": "2026-10-26",
+          "role": "primary",
+          "note": "27.2 베타, 함께 추가된 언어와 지원 기기를 확인했어요"
+        },
+        {
+          "name": "지디넷코리아",
+          "title": "애플, 한국어 '시리 AI' 출시…메시지 찾고 일정 등록",
+          "url": "https://zdnet.co.kr/view/?no=20261027174711",
+          "published": "2026-10-27",
+          "role": "report",
+          "note": "27일 배포한 27.2 업데이트와 주요 기능 예시를 확인했어요"
+        },
+        {
+          "name": "이코노믹리뷰",
+          "title": "아이패드 미니, OLED로 태어나다…한국어 ‘시리 AI’도 출격",
+          "url": "https://econovill.com/news/articleView.html?idxno=754995",
+          "published": "2026-10-27",
+          "role": "cross",
+          "note": "27일부터 베타, 13세 미만 제한, 하루 사용 한도를 확인했어요"
+        }
+      ]
+    },
+    {
+      "id": "and2ble-french-kissing",
+      "date": "2026-10-27",
+      "group": "ent",
+      "cat": "아이돌",
+      "keyword": "앤더블 프렌치 키싱",
+      "line": "앤더블이 27일 5개월 만에 미니 2집을 냈어요",
+      "meaning": "5인조 그룹 앤더블(AND2BLE)이 27일 오후 6시 미니 2집 '시퀀스 02: 어트랙션(Sequence 02: Attraction)'을 발매했어요. 타이틀곡 '프렌치 키싱(French Kissing)'을 포함해 5곡이 실렸어요.",
+      "why": [
+        "앤더블은 지난 5월 데뷔한 그룹으로, 이번이 약 5개월 만의 컴백이에요. 멤버는 장하오·유승언·리키·김규빈·한유진이에요.",
+        "뉴스1에 따르면 이번 앨범은 전작의 '호기심'에 이어 '끌림'을 노래하는 이야기로 이어져요.",
+        "앤더블은 27일 오후 서울 용산구 블루스퀘어에서 발매 기념 쇼케이스를 열었고, 한국경제와 스포츠경향 등 여러 매체가 같은 날 다뤘어요."
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "zBPWdknsSig",
+          "kind": "official",
+          "channel": "AND2BLE",
+          "title": "AND2BLE (앤더블) 'French Kissing' MV Teaser 1"
+        }
+      ],
+      "stat": {
+        "value": "5곡",
+        "label": "미니 2집 수록곡"
+      },
+      "sources": [
+        {
+          "name": "뉴스1",
+          "title": "앤더블, 5개월 만의 컴백…'호기심' 잇는 치명적 '끌림' 서사 연다 [N이슈]",
+          "url": "https://www.news1.kr/entertain/music/6332797",
+          "published": "2026-10-27",
+          "role": "report",
+          "note": "5개월 만의 컴백, '호기심'에 이은 '끌림' 이야기를 확인했어요"
+        },
+        {
+          "name": "한국경제",
+          "title": "관심을 끌림으로…앤더블의 해 됐으면",
+          "url": "https://www.hankyung.com/article/202610278499H",
+          "published": "2026-10-27",
+          "role": "cross",
+          "note": "5곡 수록, 멤버 다섯 명, 5월 데뷔를 따로 확인했어요"
+        },
+        {
+          "name": "스포츠경향",
+          "title": "앤더블 규빈 “2026년, 앤더블의 해로 기억되길”",
+          "url": "https://sports.khan.co.kr/article/202610271712003/",
+          "published": "2026-10-27",
+          "role": "cross",
+          "note": "27일 블루스퀘어 쇼케이스와 오후 6시 발매를 확인했어요"
+        }
+      ]
+    },
     {
       "id": "kosdaq-drop-oct26",
       "date": "2026-10-27",
