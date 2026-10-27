@@ -72,6 +72,16 @@
         "이투데이는 두께가 14%, 무게가 13% 줄었다고 전했고, 아주경제는 두께가 5.4mm라고 전했어요.",
         "두 매체에 따르면 사전 주문은 28일, 판매는 11월 6일부터예요. 이투데이는 애플이 28일 로스앤젤레스에서 신제품 행사를 연다고 전했어요."
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "x5h1JykMcFU",
+          "kind": "official",
+          "channel": "Apple",
+          "title": "Introducing the new iPad mini with OLED display"
+        }
+      ],
       "stat": {
         "value": "8.5인치",
         "label": "새 아이패드 미니 화면"
@@ -281,6 +291,16 @@
         "스타뉴스에 따르면 26일에도 하루 2만 151명이 봐 1위였고, 그날까지 누적 관객은 226만 8277명이었어요.",
         "톱스타뉴스에 따르면 27일 2위는 '실낙원'(하루 9413명), 3위는 '타짜: 벨제붑의 노래'(하루 9281명)였어요."
       ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "-DjykB2XImc",
+          "kind": "official",
+          "channel": "CJ ENM Movie",
+          "title": "[극장판 치이카와: 인어 섬의 비밀] 메인 예고편"
+        }
+      ],
       "stat": {
         "value": "228만 명",
         "label": "27일까지 누적 관객"
@@ -351,6 +371,16 @@
       "why": [
         "지디넷코리아와 CNB뉴스에 따르면 엔씨는 누적 플레이 시간이 1억 820만 시간, 최고 동시접속자가 40만 명을 넘었다고 밝혔어요.",
         "CNB뉴스에 따르면 회사는 출시 첫 주 스팀 주간 글로벌 매출 차트 1위에 올랐다고 설명했어요."
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "Y0OrNb7SJx0",
+          "kind": "official",
+          "channel": "AION2",
+          "title": "[아이온2] 게임플레이 트레일러"
+        }
       ],
       "stat": {
         "value": "630만 개",
