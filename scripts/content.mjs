@@ -95,6 +95,8 @@ const NEWS_CHANNELS = [
   '대구MBC뉴스',
   // 2026-10-26 주간 점검: 뉴스TVCHOSUN(TV조선), 스타뉴스 STARNEWS(머니투데이 계열 스타뉴스), kt HCN 핫콘뉴스(케이블 방송사 kt HCN 지역뉴스), iMBC연예(MBC 자회사 iMBC 연예뉴스)
   '뉴스TVCHOSUN', '스타뉴스 STARNEWS', 'kt HCN 핫콘뉴스', 'iMBC연예',
+  // 2026-11-02 주간 점검: K-Culture NOW by 연합뉴스(연합뉴스), MTN STAR(머니투데이방송 연예), Yahoo Finance(야후 파이낸스 뉴스)
+  'K-Culture NOW by 연합뉴스', 'MTN STAR', 'Yahoo Finance',
   'ABC News', 'Bloomberg Television', 'CNBC Television', 'Reuters', 'BBC News', 'CNN', 'Associated Press', 'NBC News', 'CBS News', 'Sky News'
 ];
 // 제목에 이런 말이 있으면 반응 영상·모음·자극적인 영상일 가능성이 커서 쓰지 않아요.
@@ -136,7 +138,9 @@ const OFFICIAL_CHANNELS = [
   // 2026-10-24 사용자 확인으로 추가: 가수 크러쉬 공식 채널
   'Crush', 'BABYMONSTER',
   // 2026-10-26 주간 점검: JTBC Drama(JTBC 드라마 공식), MBCkpop(MBC 예능·음악 공식), SLL_official(드라마 제작사 SLL), SPOTV Golf(LPGA 국내 중계권사 SPOTV), 업비트 - Upbit Official(두나무 업비트)
-  'JTBC Drama', 'MBCkpop', 'SLL_official', 'SPOTV Golf', '업비트 - Upbit Official'
+  'JTBC Drama', 'MBCkpop', 'SLL_official', 'SPOTV Golf', '업비트 - Upbit Official',
+  // 2026-11-02 주간 점검: SBS·SBS 스브스 Drama·SBS Catch(SBS 공식), MBCdrama(MBC 드라마 공식), SPOTV(스포츠 중계권사), MLB(메이저리그 공식), LPGA(LPGA 투어 공식)
+  'SBS', 'SBS 스브스 Drama', 'SBS Catch', 'MBCdrama', 'SPOTV', 'MLB', 'LPGA'
 ];
 const OFFICIAL_CHANNEL_KEYS = new Set(OFFICIAL_CHANNELS.map(normName));
 
