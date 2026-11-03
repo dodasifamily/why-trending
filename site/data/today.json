@@ -1,8 +1,54 @@
 {
   "schema": 1,
   "date": "2026-11-03",
-  "updatedAt": "2026-11-03T15:46:43+09:00",
+  "updatedAt": "2026-11-03T19:47:43+09:00",
   "cards": [
+    {
+      "id": "treasure-shock-comeback",
+      "date": "2026-11-03",
+      "group": "ent",
+      "cat": "아이돌",
+      "keyword": "트레저 SHOCK",
+      "line": "트레저 'SHOCK'가 아이튠즈 10개 지역 1위에 올랐어요",
+      "meaning": "트레저가 2일 오후 6시 새 디지털 싱글 'SHOCK'를 냈어요. 6월 미니 4집 이후 처음 내는 신곡이고, 3일 보도에 따르면 아이튠즈 송 차트 10개 지역 1위, 중국 QQ뮤직과 일본 AWA 차트 1위에 올랐어요.",
+      "why": [
+        "트레저는 2일 오후 6시 새 싱글 'SHOCK'를 공개했고, 뉴스엔과 스포티비뉴스는 3일 이 곡이 아이튠즈 송 차트 10개 지역에서 1위를 했다고 전했어요.",
+        "두 매체에 따르면 이 곡은 중국 QQ뮤직의 디지털 싱글 일간 차트와 일본 AWA 신곡 TOP 100에서도 1위에 올랐어요.",
+        "두 매체에 따르면 뮤직비디오는 유튜브 조회수 600만 회를 넘었고, 뉴스엔은 트레저가 7일 서울 고척스카이돔에서 열리는 KGMA 무대에 오른다고 전했어요."
+      ],
+      "media": [
+        {
+          "type": "video",
+          "provider": "youtube",
+          "id": "u_hpZueWI9g",
+          "kind": "official",
+          "channel": "TREASURE (트레저)",
+          "title": "TREASURE - ‘SHOCK’ M/V"
+        }
+      ],
+      "stat": {
+        "value": "10개 지역",
+        "label": "아이튠즈 송 차트 1위"
+      },
+      "sources": [
+        {
+          "name": "뉴스엔",
+          "title": "트레저 ‘SHOCK’ 아이튠즈 10개 지역 1위 찍었다 “中·日 주요 차트도 정상”",
+          "url": "https://www.newsen.com/news_view.php?uid=202611031513451910",
+          "published": "2026-11-03",
+          "role": "report",
+          "note": "아이튠즈 10개 지역 1위, QQ뮤직·AWA 1위, KGMA 출연을 확인했어요"
+        },
+        {
+          "name": "스포티비뉴스",
+          "title": "트레저, '쇼크' 아이튠즈 10개 지역 1위로 '화려한 컴백 신고식'…中·日 주요 차트도 정상",
+          "url": "https://www.spotvnews.co.kr/news/articleView.html?idxno=1017234",
+          "published": "2026-11-03",
+          "role": "cross",
+          "note": "2일 오후 6시 발매와 같은 차트 성적, 조회수 600만을 확인했어요"
+        }
+      ]
+    },
     {
       "id": "kosdaq-drop-oct26",
       "date": "2026-11-03",
