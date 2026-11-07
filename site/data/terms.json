@@ -1,7 +1,51 @@
 {
   "schema": 1,
-  "updatedAt": "2026-11-07T18:14:09+09:00",
+  "updatedAt": "2026-11-07T19:44:58+09:00",
   "terms": [
+    {
+      "id": "t1-worlds-2026-semifinal",
+      "date": "2026-11-07",
+      "group": "game",
+      "cat": "롤드컵",
+      "keyword": "T1 롤드컵 4강",
+      "line": "T1이 7일 8강에서 KC를 3-1로 꺾고 4강에 올랐어요",
+      "meaning": "리그 오브 레전드 월드 챔피언십(롤드컵) 8강에서 한국 LCK의 T1이 7일(한국 시간) 유럽 LEC의 카르민 코프(KC)를 세트 스코어 3-1로 이겼어요. 경기는 미국 텍사스주 앨런에서 열렸어요.",
+      "why": [
+        "T1은 1·2세트를 먼저 가져갔고, 3세트를 KC에 내준 뒤 4세트를 이겨 시리즈를 끝냈어요.",
+        "테크M과 위키트리는 T1이 이번 승리로 6년 연속 월즈 4강에 올랐다고 전했어요.",
+        "T1은 9일 전날 DK를 꺾은 중국 LPL의 빌리빌리 게이밍(BLG)과 결승 진출을 다퉈요. 8일에는 젠지와 인빅터스 게이밍(IG)의 4강이 먼저 열려, 4강 두 경기가 모두 한국과 중국 팀의 대결이 됐어요."
+      ],
+      "stat": {
+        "value": "6년 연속",
+        "label": "T1 월즈 4강 진출"
+      },
+      "sources": [
+        {
+          "name": "시사저널e",
+          "title": "T1, KC 3대1 제압하고 4강행···롤드컵 ‘한중전’ 완성",
+          "url": "https://www.sisajournal-e.com/news/articleView.html?idxno=424867",
+          "published": "2026-11-07",
+          "role": "report",
+          "note": "3-1 승리, 세트별 결과, 경기 장소, 4강 대진과 날짜를 확인했어요"
+        },
+        {
+          "name": "테크M",
+          "title": "[롤드컵 브리핑] 젠지 완승에 T1 뒷심까지...4강 오른 LCK, 한중전 돌입",
+          "url": "https://www.techm.kr/news/articleView.html?idxno=157045",
+          "published": "2026-11-07",
+          "role": "cross",
+          "note": "3-1 승리와 6년 연속 4강, 8일·9일 4강 대진을 확인했어요"
+        },
+        {
+          "name": "위키트리",
+          "title": "T1, 파리 역전패 안긴 KC 3대1로 꺾고 6년 연속 4강…롤드컵 4연패 도전 이어간다",
+          "url": "https://wikitree.co.kr/articles/1172674",
+          "published": "2026-11-07",
+          "role": "cross",
+          "note": "세트별 결과와 9일 BLG전 일정을 따로 확인했어요"
+        }
+      ]
+    },
     {
       "id": "korean-series-2026-kt-samsung",
       "date": "2026-11-07",
