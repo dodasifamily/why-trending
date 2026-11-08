@@ -140,7 +140,9 @@ const OFFICIAL_CHANNELS = [
   // 2026-10-26 주간 점검: JTBC Drama(JTBC 드라마 공식), MBCkpop(MBC 예능·음악 공식), SLL_official(드라마 제작사 SLL), SPOTV Golf(LPGA 국내 중계권사 SPOTV), 업비트 - Upbit Official(두나무 업비트)
   'JTBC Drama', 'MBCkpop', 'SLL_official', 'SPOTV Golf', '업비트 - Upbit Official',
   // 2026-11-02 주간 점검: SBS·SBS 스브스 Drama·SBS Catch(SBS 공식), MBCdrama(MBC 드라마 공식), SPOTV(스포츠 중계권사), MLB(메이저리그 공식), LPGA(LPGA 투어 공식)
-  'SBS', 'SBS 스브스 Drama', 'SBS Catch', 'MBCdrama', 'SPOTV', 'MLB', 'LPGA'
+  'SBS', 'SBS 스브스 Drama', 'SBS Catch', 'MBCdrama', 'SPOTV', 'MLB', 'LPGA',
+  // 2026-11-09 주간 점검: JISOO(지수 본인 공식 채널), IVE(스타쉽 운영 그룹 공식), OpenAI(기업 공식), SBSKPOP X INKIGAYO(SBS 인기가요 공식), SBS Golf(KLPGA·KPGA 중계권사 SBS골프)
+  'JISOO', 'IVE', 'OpenAI', 'SBSKPOP X INKIGAYO', 'SBS Golf'
 ];
 const OFFICIAL_CHANNEL_KEYS = new Set(OFFICIAL_CHANNELS.map(normName));
 
