@@ -1835,12 +1835,33 @@
     document.documentElement.style.setProperty('--ad-h', Math.max(0, Math.round(px || 0)) + 'px');
   }
 
+  // 광고 테스트 모드를 서버에서 켜고 끌 수 있어요 (0.4.9, 2026-11-10: 비공개 테스트 동안 테스터가 실제 광고를 누르지 않게).
+  // site/data/flags.json 의 adsTest 가 true 면 구글 테스트 광고만 보여줘요. 못 받으면 마지막으로 받은 값, 그것도 없으면 config.js 값을 써요.
+  async function adsTestMode(ads) {
+    let v;
+    try {
+      const f = await getJson((CFG.remoteBase || '') + 'data/flags.json', 4000);
+      if (f && typeof f.adsTest === 'boolean') {
+        v = f.adsTest;
+        store.set('adsTest', v);
+      }
+    } catch (e) {
+      /* 아래에서 마지막 값을 써요 */
+    }
+    if (typeof v !== 'boolean') {
+      const last = store.get('adsTest', null);
+      v = typeof last === 'boolean' ? last : !!ads.test;
+    }
+    return v;
+  }
+
   async function initAds() {
     const Ad = plugin('AdMob');
     const ads = CFG.ads || {};
     if (!Ad || !ads.bannerAdId) return;
     try {
-      await Ad.initialize({ initializeForTesting: !!ads.test });
+      const testing = await adsTestMode(ads);
+      await Ad.initialize({ initializeForTesting: testing });
       try {
         // 유럽 등 동의가 필요한 지역에서만 동의 창이 떠요
         const info = await Ad.requestConsentInfo();
@@ -1850,7 +1871,7 @@
       }
       Ad.addListener('bannerAdSizeChanged', (size) => setAdHeight(size && size.height));
       Ad.addListener('bannerAdFailedToLoad', () => setAdHeight(0));
-      await Ad.showBanner({ adId: ads.bannerAdId, adSize: 'ADAPTIVE_BANNER', position: 'BOTTOM_CENTER', margin: 0, isTesting: !!ads.test });
+      await Ad.showBanner({ adId: ads.bannerAdId, adSize: 'ADAPTIVE_BANNER', position: 'BOTTOM_CENTER', margin: 0, isTesting: testing });
     } catch (e) {
       setAdHeight(0);
     }

@@ -1,6 +1,6 @@
 // 앱 설정. 공개 저장소에 올라가므로 비밀 값은 절대 넣지 않아요.
 window.WT_CONFIG = {
-  appVersion: '0.4.8',
+  appVersion: '0.4.9',
 
   // 공유 링크와 앱의 최신 해설을 받아오는 주소 (GitHub Pages)
   siteUrl: 'https://dodasifamily.github.io/why-trending/',
@@ -9,7 +9,7 @@ window.WT_CONFIG = {
   // 광고 (안드로이드 앱에서만 보여요)
   ads: {
     // 2026-10-20: AdMob 에서 만든 실제 배너 광고 단위 ID 로 바꿨어요. 개발·시험 중 내 기기에서 광고를 누르지 않도록 주의해요(AdMob 정책).
-    test: false,
+    test: true, // 2026-11-10: 실제 광고 여부는 site/data/flags.json 의 adsTest 로 정해요. 이 값은 그 파일을 한 번도 못 받았을 때만 써요(안전하게 테스트 광고)
     bannerAdId: 'ca-app-pub-5198471293233425/2821677755'
   },
 

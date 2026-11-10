@@ -121,6 +121,7 @@
 - GitHub Pages 는 켜져 있어요 (Source = GitHub Actions). 사이트 주소: https://dodasifamily.github.io/why-trending/
 - 출시용 서명 키: Settings → Secrets and variables → Actions 에 `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` 를 등록해요.
 - 광고: `site/js/config.js` 의 `ads` 와 `app/app.config.json` 의 AdMob 앱 ID 는 실제 값이에요(2026-10-20 에 테스트 값에서 바꿈).
+- 광고 테스트 모드 스위치(0.4.9~): `site/data/flags.json` 의 `adsTest` 가 `true` 면 앱이 구글 테스트 광고만 보여줘요. 비공개 테스트 동안 `true`, **정식 출시 때 `false` 로 바꿔요**(사이트만 다시 올리면 되고 앱은 그대로예요).
 - '내용이 이상해요' 신고: `site/js/config.js` 의 `report.endpoint`(폼) 또는 `report.email`(메일)을 채우면 켜져요.
 
 ## 비밀 정보

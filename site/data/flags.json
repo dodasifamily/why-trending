@@ -1,0 +1,5 @@
+{
+  "schema": 1,
+  "note": "adsTest: true 면 앱이 구글 테스트 광고만 보여줘요. 비공개 테스트 동안 true, 정식 출시 때 false 로 바꿔요 (앱 다시 올릴 필요 없음).",
+  "adsTest": true
+}
