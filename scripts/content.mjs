@@ -97,6 +97,8 @@ const NEWS_CHANNELS = [
   '뉴스TVCHOSUN', '스타뉴스 STARNEWS', 'kt HCN 핫콘뉴스', 'iMBC연예',
   // 2026-11-02 주간 점검: K-Culture NOW by 연합뉴스(연합뉴스), MTN STAR(머니투데이방송 연예), Yahoo Finance(야후 파이낸스 뉴스)
   'K-Culture NOW by 연합뉴스', 'MTN STAR', 'Yahoo Finance',
+  // 2026-11-16 주간 점검: ABC10(미국 새크라멘토 지역 방송사 KXTV 뉴스)
+  'ABC10',
   'ABC News', 'Bloomberg Television', 'CNBC Television', 'Reuters', 'BBC News', 'CNN', 'Associated Press', 'NBC News', 'CBS News', 'Sky News'
 ];
 // 제목에 이런 말이 있으면 반응 영상·모음·자극적인 영상일 가능성이 커서 쓰지 않아요.
@@ -142,7 +144,9 @@ const OFFICIAL_CHANNELS = [
   // 2026-11-02 주간 점검: SBS·SBS 스브스 Drama·SBS Catch(SBS 공식), MBCdrama(MBC 드라마 공식), SPOTV(스포츠 중계권사), MLB(메이저리그 공식), LPGA(LPGA 투어 공식)
   'SBS', 'SBS 스브스 Drama', 'SBS Catch', 'MBCdrama', 'SPOTV', 'MLB', 'LPGA',
   // 2026-11-09 주간 점검: JISOO(지수 본인 공식 채널), IVE(스타쉽 운영 그룹 공식), OpenAI(기업 공식), SBSKPOP X INKIGAYO(SBS 인기가요 공식), SBS Golf(KLPGA·KPGA 중계권사 SBS골프)
-  'JISOO', 'IVE', 'OpenAI', 'SBSKPOP X INKIGAYO', 'SBS Golf'
+  'JISOO', 'IVE', 'OpenAI', 'SBSKPOP X INKIGAYO', 'SBS Golf',
+  // 2026-11-16 주간 점검: TVCHOSUN - TV조선·TVCHOSUN JOY(TV조선 공식), KBS Kpop(KBS 공식), 안테나 Antenna(소속사 안테나), KQ ENTERTAINMENT(소속사 KQ), Disney Plus Korea 디즈니 플러스 코리아(디즈니+ 한국 공식)
+  'TVCHOSUN - TV조선', 'TVCHOSUN JOY', 'KBS Kpop', '안테나 Antenna', 'KQ ENTERTAINMENT', 'Disney Plus Korea 디즈니 플러스 코리아'
 ];
 const OFFICIAL_CHANNEL_KEYS = new Set(OFFICIAL_CHANNELS.map(normName));
 
