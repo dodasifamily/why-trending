@@ -805,6 +805,7 @@
       else if (fv.days > FEED_DAYS && S.archiveState === 'error') nodes.push(h('p', { class: 'note', role: 'status' }, `지난 이슈를 불러오지 못해서 최근 ${FEED_DAYS}일 이슈만 보여드려요. 인터넷 연결을 확인해 주세요.`));
       nodes.push(h('p', { class: 'note' }, AI_NOTE));
     }
+    nodes.push(legalLinks());
     setView(nodes, keepScroll);
   }
 
@@ -1823,11 +1824,31 @@
           S.groups ? h('button', { class: 'btn ghost', type: 'button', style: 'margin-top:14px', onclick: () => go('/pick') }, '분야 바꾸기') : null,
           h('div', { class: 'info' }, icon('info', 16), h('span', null, push ? '앱 화면에는 고른 분야의 이슈만 보여드려요. 아침 알림은 분야와 상관없이 하루 한 번, 오늘 새로 올라온 이슈를 한꺼번에 알려드려요. \'항상\'을 고르면 낮 동안 고른 분야에 새 이슈가 올라올 때도 알려드려요. 정한 시각보다 몇 분 늦게 올 수 있어요. 확인된 사실만 전하고, 정치 공방과 범죄·사고, 확인되지 않은 의혹은 다루지 않아요.' : '고른 분야의 이슈만 오늘 화면에 보여요. 확인된 사실만 전하고, 정치 공방과 범죄·사고, 확인되지 않은 의혹은 다루지 않아요.'))
         ),
+        contactPanel(),
         h('div', { class: 'info' }, icon('info', 16), h('span', null, AI_NOTE)),
-        h('p', { class: 'legal' }, h('a', { href: 'privacy.html' }, '개인정보처리방침'))
+        legalLinks()
       ],
       false
     );
+  }
+
+  // ---------- 문의하기 (2026-11-16: Google Play 뉴스 정책 — 앱 안에 '문의하기' 라벨이 붙은 연락처가 있어야 해요) ----------
+  function contactEmail() {
+    return (CFG.report && CFG.report.email) || 'issuewhyhelp@gmail.com';
+  }
+  function contactPanel() {
+    const email = contactEmail();
+    return h(
+      'div',
+      { class: 'panel', id: 'contact', 'aria-labelledby': 'contact-title' },
+      h('div', { class: 'ptitle', id: 'contact-title' }, '문의하기'),
+      h('p', { class: 'sub', style: 'margin:8px 0 0' }, '내용 오류·정정 요청, 출처·저작권, 앱 사용 문의는 이메일로 보내 주세요.'),
+      h('p', { style: 'margin:10px 0 0;font-weight:700' }, '이메일: ', h('a', { href: `mailto:${email}` }, email)),
+      h('a', { class: 'btn ghost', href: 'contact.html', style: 'margin-top:14px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none' }, '문의하기 페이지 열기')
+    );
+  }
+  function legalLinks() {
+    return h('p', { class: 'legal' }, h('a', { href: 'contact.html' }, '문의하기'), ' · ', h('a', { href: 'editorial.html' }, '편집 원칙'), ' · ', h('a', { href: 'privacy.html' }, '개인정보처리방침'));
   }
 
   // ---------- 광고 (안드로이드 앱에서만) ----------
