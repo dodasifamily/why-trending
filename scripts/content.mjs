@@ -116,6 +116,9 @@ const CLIP_FIRST_GROUPS = ['meme']; // 처음부터 관련 영상으로 찾는 �
 const CLIP_MAX = 2;
 const CLIP_MIN_VIEWS = 100000; // 밈
 const CLIP_MIN_VIEWS_FALLBACK = 30000; // 밈이 아닌 분야: 갓 올라온 영상이 많아서 기준을 낮추되, 대신 카드 날짜 앞 FIND_CLIP_FALLBACK_DAYS 일 안에 올라온 영상만 써요
+// 밈이 아닌 분야의 관련 영상: 자극적인 제목·외모를 앞세운 채널·팬 편집 컷도 쓰지 않아요 (제목과 채널 이름 모두 봐요)
+const CLIP_FALLBACK_BLOCKED = /미쳤|미친|환장|소름|실화|레전드|난리|발칵|미녀|섹시|몸매|노출|ㅋㅋ|선공개|움짤|\bcut\b|컷|편집본|#shorts|팬캠|덕질/i;
+const FIND_CLIP_FALLBACK_MIN_SECONDS = 60; // 쇼츠·짧은 편집 컷 빼기
 const clipMinViews = (card) => (CLIP_FIRST_GROUPS.includes(card.group) ? CLIP_MIN_VIEWS : CLIP_MIN_VIEWS_FALLBACK);
 // 일반 채널이 올린 방송·경기 원본(재업로드)일 수 있는 제목은 관련 영상으로 쓰지 않아요 (원본은 뉴스·공식 채널 영상으로만)
 const CLIP_REUPLOAD_BLOCKED = /풀\s*영상|full\s*(ver|version|video|영상|경기)|다시\s*보기|재업|무편집|하이라이트|highlights?|직캠|fancam|\bmv\b|m\/v|뮤직\s*비디오|official\s*(video|audio)|가사|lyrics?|불법|토렌트/i;
@@ -628,6 +631,7 @@ function validateClips(card, where) {
       if (CLIP_FIRST_GROUPS.includes(card.group)) {
         if (key && !textKey(m.title).includes(key)) err(w, `영상 제목에 카드 키워드 '${card.keyword}' 가 그대로 들어 있어야 해요(연관성): ${m.title}`);
       } else {
+        if (CLIP_FALLBACK_BLOCKED.test(m.title) || CLIP_FALLBACK_BLOCKED.test(String(m.channel || ''))) err(w, `자극적인 제목·채널이나 팬 편집 컷으로 보여서 관련 영상으로 쓰지 않아요: ${m.channel} | ${m.title}`);
         if (CLIP_REUPLOAD_BLOCKED.test(m.title)) err(w, `방송·경기·음원 원본을 다시 올린 영상일 수 있는 제목이라 관련 영상으로 쓰지 않아요: ${m.title}`);
         if (!clipFit(card, m.title)) err(w, `영상 제목에 카드 키워드 '${card.keyword}' 의 핵심 말(가장 긴 말 포함 절반 이상)이 들어 있어야 해요(연관성): ${m.title}`);
       }
@@ -1243,6 +1247,8 @@ function evaluateVideo(it, card, mode) {
     if (!(views >= clipMinViews(card))) return { why: '조회수 모자람' };
     if (!CLIP_FIRST_GROUPS.includes(card.group)) {
       if (CLIP_REUPLOAD_BLOCKED.test(title)) return { why: '원본 재업로드일 수 있는 제목' };
+      if (CLIP_FALLBACK_BLOCKED.test(title) || CLIP_FALLBACK_BLOCKED.test(channel)) return { why: '자극적 제목·채널, 편집 컷' };
+      if (seconds < FIND_CLIP_FALLBACK_MIN_SECONDS) return { why: '길이' };
       const start = Date.parse(`${card.date}T00:00:00+09:00`);
       if (published < start - FIND_CLIP_FALLBACK_DAYS * DAY_MS || published > start + (FIND_NEWS_DAYS_AFTER + 1) * DAY_MS) return { why: '날짜 범위 밖' };
       const cardYear = Number(card.date.slice(0, 4));
