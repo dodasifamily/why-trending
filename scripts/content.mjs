@@ -108,9 +108,17 @@ const VIDEO_TITLE_BLOCKED = /리액션|reaction|해외\s*반응|반응\s*영상|
 // 올린 곳이 일반 채널이어도 받는 대신 이렇게 걸러요: (1) 조회수 CLIP_MIN_VIEWS 이상 (갱신 담당이 영상 페이지에서 읽은 숫자, 그 뒤로는 늘기만 하니 '이상'으로 보여줘요),
 // (2) 영상 제목에 카드 키워드가 그대로 들어 있어야 해요(연관성), (3) 제목에 반응·모음·자극적인 말이나 아이(미성년자)가 주인공이라는 단서가 없어야 해요.
 // 영상 안의 내용은 우리가 확인할 수 없으니 앱이 '유튜브에 올라온 영상이에요. 내용은 왜이슈?와 관계없어요'라고 알려줘요. clips 는 출처(sources)가 아니에요.
-const CLIP_GROUPS = ['meme'];
+// 2026-11-19 사용자 요청: 이슈를 다룬 뉴스·공식 영상이 없으면 '키워드와 관련된 영상'이라도 보여줘요.
+// 밈 말고도 아래 분야는 뉴스·공식 영상을 못 찾았을 때 같은 방식(일반 채널, 조회수·제목·아이 단서 거르기)으로 관련 영상을 붙여요.
+// 경제(투자 조언 영상이 섞여요)·정책·세계(출처를 알 수 없는 해설·선전 영상이 섞여요)는 빼요.
+const CLIP_GROUPS = ['meme', 'ent', 'sports', 'game', 'tech', 'life'];
+const CLIP_FIRST_GROUPS = ['meme']; // 처음부터 관련 영상으로 찾는 분야. 나머지 CLIP_GROUPS 는 뉴스·공식 영상을 먼저 찾고, 없을 때만 관련 영상을 찾아요
 const CLIP_MAX = 2;
-const CLIP_MIN_VIEWS = 100000;
+const CLIP_MIN_VIEWS = 100000; // 밈
+const CLIP_MIN_VIEWS_FALLBACK = 30000; // 밈이 아닌 분야: 갓 올라온 영상이 많아서 기준을 낮추되, 대신 카드 날짜 앞 FIND_CLIP_FALLBACK_DAYS 일 안에 올라온 영상만 써요
+const clipMinViews = (card) => (CLIP_FIRST_GROUPS.includes(card.group) ? CLIP_MIN_VIEWS : CLIP_MIN_VIEWS_FALLBACK);
+// 일반 채널이 올린 방송·경기 원본(재업로드)일 수 있는 제목은 관련 영상으로 쓰지 않아요 (원본은 뉴스·공식 채널 영상으로만)
+const CLIP_REUPLOAD_BLOCKED = /풀\s*영상|full\s*(ver|version|video|영상|경기)|다시\s*보기|재업|무편집|하이라이트|highlights?|직캠|fancam|\bmv\b|m\/v|뮤직\s*비디오|official\s*(video|audio)|가사|lyrics?|불법|토렌트/i;
 const CLIP_TITLE_BLOCKED = /초등|초딩|중딩|고딩|어린이|유치원|키즈|\bkids?\b|아기|애기|베이비|꼬마|청소년|미성년/i;
 // 예전 형식(from) 영상을 가져오는 기사 매체
 const VIDEO_FROM_HOSTS = [
@@ -617,10 +625,16 @@ function validateClips(card, where) {
       scanBlocked(w, 'title', m.title);
       if (VIDEO_TITLE_BLOCKED.test(m.title)) err(w, `영상 제목에 반응 영상·모음·자극적인 영상의 단서가 있어요: ${m.title}`);
       if (CLIP_TITLE_BLOCKED.test(m.title)) err(w, `영상 제목에 아이(미성년자)가 주인공일 수 있는 단서가 있어서 쓰지 않아요: ${m.title}`);
-      if (key && !textKey(m.title).includes(key)) err(w, `영상 제목에 카드 키워드 '${card.keyword}' 가 그대로 들어 있어야 해요(연관성): ${m.title}`);
+      if (CLIP_FIRST_GROUPS.includes(card.group)) {
+        if (key && !textKey(m.title).includes(key)) err(w, `영상 제목에 카드 키워드 '${card.keyword}' 가 그대로 들어 있어야 해요(연관성): ${m.title}`);
+      } else {
+        if (CLIP_REUPLOAD_BLOCKED.test(m.title)) err(w, `방송·경기·음원 원본을 다시 올린 영상일 수 있는 제목이라 관련 영상으로 쓰지 않아요: ${m.title}`);
+        if (!clipFit(card, m.title)) err(w, `영상 제목에 카드 키워드 '${card.keyword}' 의 핵심 말(가장 긴 말 포함 절반 이상)이 들어 있어야 해요(연관성): ${m.title}`);
+      }
     }
-    if (!Number.isInteger(m.views) || m.views < CLIP_MIN_VIEWS || m.views > 100000000000) {
-      err(w, `views 는 영상 페이지에서 읽은 조회수(${CLIP_MIN_VIEWS} 이상의 정수)여야 해요`);
+    const minViews = clipMinViews(card);
+    if (!Number.isInteger(m.views) || m.views < minViews || m.views > 100000000000) {
+      err(w, `views 는 영상 페이지에서 읽은 조회수(${minViews} 이상의 정수)여야 해요`);
     }
   });
 }
@@ -1077,6 +1091,7 @@ const FIND_NEWS_DAYS_AFTER = 3; // 카드 날짜 뒤로 이만큼(당일 포함�
 const FIND_MIN_SECONDS = 10;
 const FIND_NEWS_MAX_SECONDS = 15 * 60;
 const FIND_CLIP_MAX_SECONDS = 20 * 60;
+const FIND_CLIP_FALLBACK_DAYS = 14; // 밈이 아닌 분야의 관련 영상은 카드 날짜 앞 14일 안에 올라온 것만 (지난 일 영상이 섞이지 않게)
 const FIND_CLIP_MIN_KEYWORD = 3; // 밈 키워드가 이보다 짧으면(예: '야르') 다른 뜻의 영상이 섞일 수 있어서 자동으로 붙이지 않아요
 const VIDEO_BLOCK_IDS = []; // 문제가 알려진 영상 번호: 자동으로 붙이지 않아요 (이상한 영상이 보이면 여기에 번호를 추가해요)
 const VIDEO_BLOCK_CHANNELS = []; // 자동으로 붙이지 않을 채널 이름
@@ -1150,11 +1165,26 @@ function ytProblemText(r) {
 // 영상 제목이 카드 키워드와 얼마나 맞는지(0~1). 0 이면 쓰지 않아요.
 //  - 밈·신조어(clips): 키워드가 제목에 그대로 들어 있어야 해요 (validateClips 와 같은 규칙).
 //  - 뉴스·행사(news): 키워드를 띄어쓰기로 나눈 말 가운데 가장 긴 말(사람·행사·제품 이름)은 꼭 들어 있고, 전체의 2/3 이상이 들어 있어야 해요.
+// 밈이 아닌 분야의 관련 영상(clips) 제목 연관성: 키워드의 가장 긴 말이 꼭 있고, 키워드 말의 절반 이상(최소 2개, 말이 2개 이하면 전부)이 있어야 해요.
+// 뉴스 영상의 '한 줄 요약 말까지 합쳐 3개' 같은 느슨한 규칙은 쓰지 않아요(일반 채널이라 더 엄격하게).
+function clipFit(card, title) {
+  const full = textKey(card.keyword);
+  const tk = textKey(title);
+  if (!full || !tk) return 0;
+  if (tk.includes(full)) return 1;
+  const tokens = String(card.keyword).split(/\s+/).map(textKey).filter((t) => t.length >= 2);
+  if (tokens.length < 2) return 0;
+  const longest = tokens.reduce((a, b) => (b.length > a.length ? b : a));
+  const hit = tokens.filter((t) => tk.includes(t)).length;
+  const need = tokens.length <= 2 ? tokens.length : Math.max(2, Math.ceil(tokens.length / 2));
+  return tk.includes(longest) && hit >= need ? hit / tokens.length : 0;
+}
+
 function keywordFit(card, title, mode) {
   const full = textKey(card.keyword);
   const tk = textKey(title);
   if (!full) return 0;
-  if (mode === 'clips') return tk.includes(full) ? 1 : 0;
+  if (mode === 'clips') return CLIP_FIRST_GROUPS.includes(card.group) ? (tk.includes(full) ? 1 : 0) : clipFit(card, title);
   const tokens = String(card.keyword).split(/\s+/).map(textKey).filter((t) => t.length >= 2);
   if (!tokens.length) return tk.includes(full) ? 1 : 0;
   const longest = tokens.reduce((a, b) => (b.length > a.length ? b : a));
@@ -1210,7 +1240,14 @@ function evaluateVideo(it, card, mode) {
     const cardYear = Number(card.date.slice(0, 4));
     if ([...title.matchAll(/(?<![0-9])(20\d{2})(?![0-9])/g)].some((m) => Number(m[1]) < cardYear)) return { why: '지난 연도 제목' };
   } else {
-    if (!(views >= CLIP_MIN_VIEWS)) return { why: '조회수 모자람' };
+    if (!(views >= clipMinViews(card))) return { why: '조회수 모자람' };
+    if (!CLIP_FIRST_GROUPS.includes(card.group)) {
+      if (CLIP_REUPLOAD_BLOCKED.test(title)) return { why: '원본 재업로드일 수 있는 제목' };
+      const start = Date.parse(`${card.date}T00:00:00+09:00`);
+      if (published < start - FIND_CLIP_FALLBACK_DAYS * DAY_MS || published > start + (FIND_NEWS_DAYS_AFTER + 1) * DAY_MS) return { why: '날짜 범위 밖' };
+      const cardYear = Number(card.date.slice(0, 4));
+      if ([...title.matchAll(/(?<![0-9])(20\d{2})(?![0-9])/g)].some((m) => Number(m[1]) < cardYear)) return { why: '지난 연도 제목' };
+    }
     const around = [title, channel, ...(Array.isArray(sn.tags) ? sn.tags : []), String(sn.description || '').slice(0, 400)].join(' ');
     if (CLIP_TITLE_BLOCKED.test(around)) return { why: '아이(미성년자) 단서' };
   }
@@ -1260,7 +1297,8 @@ async function searchPick(card, mode, key, stat) {
     order: meme ? 'viewCount' : 'relevance'
   };
   if (/[가-힣]/.test(card.keyword)) params.relevanceLanguage = 'ko';
-  if (!meme && Number.isFinite(start)) params.publishedAfter = new Date(start - FIND_NEWS_DAYS_BEFORE * DAY_MS).toISOString();
+  const memeFirst = meme && CLIP_FIRST_GROUPS.includes(card.group);
+  if (!memeFirst && Number.isFinite(start)) params.publishedAfter = new Date(start - (meme ? FIND_CLIP_FALLBACK_DAYS : FIND_NEWS_DAYS_BEFORE) * DAY_MS).toISOString();
   stat.searched++;
   const s = await ytGet('search', params, key);
   if (s.status !== 200) return { problem: s };
@@ -1383,7 +1421,7 @@ async function findVideos() {
       stat.postponed++;
       continue;
     }
-    const mode = CLIP_GROUPS.includes(card.group) ? 'clips' : 'news';
+    const mode = CLIP_FIRST_GROUPS.includes(card.group) ? 'clips' : 'news';
     if (mode === 'clips' && textKey(card.keyword).length < FIND_CLIP_MIN_KEYWORD) {
       const short = `키워드가 짧아서(${FIND_CLIP_MIN_KEYWORD}글자 미만) 자동으로 찾지 않아요`;
       cache.cards[card.id] = { sig, searchedAt: nowIso, pick: null, why: short };
@@ -1392,7 +1430,14 @@ async function findVideos() {
       console.log(`  ${card.id} (${card.keyword}): ${short}`);
       continue;
     }
-    const r = await searchPick(card, mode, key, stat);
+    let r = await searchPick(card, mode, key, stat);
+    // 2026-11-19: 뉴스·공식 영상이 없으면 관련 영상(일반 채널)을 한 번 더 찾아요. 검색 한도 안에서만요.
+    if (!r.problem && !r.pick && mode === 'news' && CLIP_GROUPS.includes(card.group) && textKey(card.keyword).length >= FIND_CLIP_MIN_KEYWORD && stat.searched < FIND_MAX_SEARCHES && Date.now() <= deadline) {
+      await sleep(200);
+      const r2 = await searchPick(card, 'clips', key, stat);
+      if (r2.problem || r2.pick) r = r2;
+      else r = { ...r, why: `${r.why} / 관련 영상도 못 찾음: ${r2.why}` };
+    }
     if (r.problem) {
       stopped = ytProblemText(r.problem);
       console.log(`::warning title=영상 자동 찾기를 멈췄어요::${ghEsc(stopped)}`);
