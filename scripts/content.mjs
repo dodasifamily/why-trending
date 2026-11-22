@@ -99,6 +99,8 @@ const NEWS_CHANNELS = [
   'K-Culture NOW by 연합뉴스', 'MTN STAR', 'Yahoo Finance',
   // 2026-11-16 주간 점검: ABC10(미국 새크라멘토 지역 방송사 KXTV 뉴스)
   'ABC10',
+  // 2026-11-23 주간 점검: FRANCE 24 English(프랑스 국영 국제뉴스 방송사 FRANCE 24), KNN NEWS(부산·경남 지역 민영방송사 KNN)
+  'FRANCE 24 English', 'KNN NEWS',
   'ABC News', 'Bloomberg Television', 'CNBC Television', 'Reuters', 'BBC News', 'CNN', 'Associated Press', 'NBC News', 'CBS News', 'Sky News'
 ];
 // 제목에 이런 말이 있으면 반응 영상·모음·자극적인 영상일 가능성이 커서 쓰지 않아요.
@@ -157,7 +159,10 @@ const OFFICIAL_CHANNELS = [
   // 2026-11-09 주간 점검: JISOO(지수 본인 공식 채널), IVE(스타쉽 운영 그룹 공식), OpenAI(기업 공식), SBSKPOP X INKIGAYO(SBS 인기가요 공식), SBS Golf(KLPGA·KPGA 중계권사 SBS골프)
   'JISOO', 'IVE', 'OpenAI', 'SBSKPOP X INKIGAYO', 'SBS Golf',
   // 2026-11-16 주간 점검: TVCHOSUN - TV조선·TVCHOSUN JOY(TV조선 공식), KBS Kpop(KBS 공식), 안테나 Antenna(소속사 안테나), KQ ENTERTAINMENT(소속사 KQ), Disney Plus Korea 디즈니 플러스 코리아(디즈니+ 한국 공식)
-  'TVCHOSUN - TV조선', 'TVCHOSUN JOY', 'KBS Kpop', '안테나 Antenna', 'KQ ENTERTAINMENT', 'Disney Plus Korea 디즈니 플러스 코리아'
+  'TVCHOSUN - TV조선', 'TVCHOSUN JOY', 'KBS Kpop', '안테나 Antenna', 'KQ ENTERTAINMENT', 'Disney Plus Korea 디즈니 플러스 코리아',
+  // 2026-11-23 주간 점검: 멜론 Melon(카카오엔터테인먼트 음악 플랫폼 공식), M2(CJ ENM Mnet 디지털 공식), KFATV 대한민국 축구 국가대표팀(대한축구협회 공식), Microsoft Events(마이크로소프트 공식),
+  // KBS 한국방송(KBS 공식), YENA(최예나)(가수 최예나 공식), TOMORROW X TOGETHER OFFICIAL(빅히트 뮤직 소속 그룹 공식), SBS Radio 에라오(SBS 라디오 공식)
+  '멜론 Melon', 'M2', 'KFATV 대한민국 축구 국가대표팀', 'Microsoft Events', 'KBS 한국방송', 'YENA(최예나)', 'TOMORROW X TOGETHER OFFICIAL', 'SBS Radio 에라오'
 ];
 const OFFICIAL_CHANNEL_KEYS = new Set(OFFICIAL_CHANNELS.map(normName));
 
