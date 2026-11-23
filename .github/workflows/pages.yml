@@ -118,7 +118,34 @@ jobs:
         with:
           path: site
 
+      # 2026-11-24: GitHub 쪽 지연으로 방금 올린 묶음을 deploy-pages 가 못 찾는 일이 잦아져서("No artifacts named github-pages"),
+      # 실패하면 기다렸다가 두 번 더 시도해요.
       - name: 사이트 올리기
+        id: deploy1
+        if: steps.check.outputs.enabled == 'true'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: 잠깐 기다리기 (1차 실패)
+        if: steps.check.outputs.enabled == 'true' && steps.deploy1.outcome == 'failure'
+        run: sleep 60
+
+      - name: 사이트 올리기 (2차)
+        id: deploy2
+        if: steps.check.outputs.enabled == 'true' && steps.deploy1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: 잠깐 기다리기 (2차 실패)
+        if: steps.check.outputs.enabled == 'true' && steps.deploy2.outcome == 'failure'
+        run: sleep 180
+
+      - name: 사이트 올리기 (3차)
+        id: deploy3
+        if: steps.check.outputs.enabled == 'true' && steps.deploy2.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+
+      - name: 올린 주소
         id: deployment
         if: steps.check.outputs.enabled == 'true'
-        uses: actions/deploy-pages@v4
+        run: echo "page_url=${{ steps.deploy3.outputs.page_url || steps.deploy2.outputs.page_url || steps.deploy1.outputs.page_url }}" >> "$GITHUB_OUTPUT"
