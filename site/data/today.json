@@ -1,8 +1,63 @@
 {
   "schema": 1,
   "date": "2026-11-23",
-  "updatedAt": "2026-11-23T15:48:13+09:00",
+  "updatedAt": "2026-11-23T18:13:26+09:00",
   "cards": [
+    {
+      "id": "ateez-up-golden-hour-6",
+      "date": "2026-11-23",
+      "firstDate": "2026-11-13",
+      "updates": [
+        {
+          "date": "2026-11-13",
+          "line": "에이티즈가 13일 오후 2시 신곡 'UP'으로 컴백해요"
+        },
+        {
+          "date": "2026-11-23",
+          "line": "에이티즈, 빌보드 200에서 통산 4번째 1위에 올랐어요"
+        }
+      ],
+      "group": "ent",
+      "cat": "음악",
+      "keyword": "에이티즈 빌보드 200 1위",
+      "line": "에이티즈, 빌보드 200에서 통산 4번째 1위에 올랐어요",
+      "meaning": "그룹 에이티즈의 미니 15집 '골든 아워 : 파트 6'가 미국 빌보드 메인 앨범 차트 '빌보드 200'(11월 28일 자)에 1위로 처음 올랐어요. 에이티즈가 이 차트 1위에 오른 건 이번이 네 번째예요.",
+      "why": [
+        "빌보드에 따르면 이 앨범은 11월 19일까지 일주일 동안 미국에서 195,000 앨범 유닛을 기록했고, 그중 순수 앨범 판매량이 191,000장이었어요.",
+        "스타뉴스는 이번이 정규 2집 '더 월드 에피소드 파이널 : 윌', 미니 11집 '골든 아워 : 파트 2', 미니 14집 '골든 아워 : 파트 5'에 이은 네 번째 1위라고 전했어요.",
+        "빌보드는 이 앨범이 에이티즈의 10번째 빌보드 200 톱10 앨범이고, 2020년대 그룹 가운데 톱10 앨범이 가장 많다고 밝혔어요."
+      ],
+      "stat": {
+        "value": "195,000",
+        "label": "첫 주 미국 앨범 유닛"
+      },
+      "sources": [
+        {
+          "name": "스타뉴스",
+          "title": "[속보]에이티즈 또 일냈다! 통산 4번째 빌보드 200 차트 1위",
+          "url": "https://www.starnewskorea.com/music/2026/11/23/2026112307090212150",
+          "published": "2026-11-23",
+          "role": "report",
+          "note": "11월 28일 자 1위, 195,000 유닛, 앞선 1위 앨범 3장을 확인했어요"
+        },
+        {
+          "name": "Billboard",
+          "title": "ATEEZ Earn Fourth No. 1 on Billboard 200 With ‘GOLDEN HOUR : Part.6’",
+          "url": "https://www.yahoo.com/entertainment/music/new-albums/articles/ateez-earn-fourth-no-1-214027068.html",
+          "published": "2026-11-22",
+          "role": "cross",
+          "note": "195,000 유닛, 순수 판매 191,000장, 10번째 톱10을 확인했어요"
+        },
+        {
+          "name": "SBS",
+          "title": "ATEEZ Lands Fourth No. 1 on US Billboard 200... Dominating Charts in Korea and US Simultaneously",
+          "url": "https://news.sbs.co.kr/english/article.do?news_id=N1008858924",
+          "published": "2026-11-23",
+          "role": "cross",
+          "note": "미니 15집의 통산 4번째 빌보드 200 1위를 따로 확인했어요"
+        }
+      ]
+    },
     {
       "id": "kosdaq-drop-oct26",
       "date": "2026-11-23",
