@@ -1,8 +1,60 @@
 {
   "schema": 1,
   "date": "2026-11-25",
-  "updatedAt": "2026-11-25T18:18:09+09:00",
+  "updatedAt": "2026-11-25T19:47:49+09:00",
   "cards": [
+    {
+      "id": "zeus-t1-return-2027",
+      "date": "2026-11-25",
+      "group": "game",
+      "cat": "e스포츠",
+      "keyword": "제우스 T1 복귀",
+      "line": "25일 T1이 '제우스' 최우제의 2년 만의 복귀를 공식 발표했어요",
+      "meaning": "리그 오브 레전드 프로팀 T1이 25일 서울 강남 T1 베이스캠프에서 연 '2027 T1 Announcement'에서 탑 라이너 '제우스' 최우제의 합류를 공식 발표했어요. 2027시즌 주전은 제우스·오너·페이커·페이즈·케리아 5명이에요.",
+      "why": [
+        "제우스는 2024년 11월 T1과 계약이 끝난 뒤 한화생명e스포츠로 옮겨 두 시즌을 뛰었고, 인벤과 경향게임스에 따르면 그곳에서 MSI 우승도 했어요.",
+        "같은 행사에서 '로치' 김강희 감독의 취임식도 열렸어요.",
+        "엑스포츠뉴스와 인벤은 계약 기간이 3년이라고 전했고, 제우스는 떠나 있던 2년 동안 조금은 어른이 돼 돌아온 것 같다는 소감을 밝혔어요."
+      ],
+      "stat": {
+        "value": "2년",
+        "label": "제우스가 T1을 떠나 있던 기간"
+      },
+      "sources": [
+        {
+          "name": "엑스포츠뉴스",
+          "title": "'제우스' 최우제, 2년 만에 T1 복귀…'2027 T1 어나운스먼트'서 합류 공식 발표 [엑's 현장]",
+          "url": "https://www.xportsnews.com/article/2223002",
+          "published": "2026-11-25",
+          "role": "report",
+          "note": "25일 행사 발표, 한화생명 이적 경위, 계약 3년을 확인했어요"
+        },
+        {
+          "name": "인벤",
+          "title": "[오피셜] '제우스' 최우제, 다시 T1 품으로",
+          "url": "https://www.inven.co.kr/webzine/news/?news=323842",
+          "published": "2026-11-25",
+          "role": "cross",
+          "note": "강남 T1 베이스캠프 발표, MSI 우승, 계약 3년을 확인했어요"
+        },
+        {
+          "name": "경향게임스",
+          "title": "친정 복귀 ‘제우스’…T1, 새해 LCK 로스터 발표",
+          "url": "https://www.khgames.co.kr/news/articleView.html?idxno=310726",
+          "published": "2026-11-25",
+          "role": "cross",
+          "note": "주전 5명 명단과 김강희 감독 취임식을 확인했어요"
+        },
+        {
+          "name": "이지경제",
+          "title": "[EZ 현장] T1, '제우스' 복귀…2027시즌 로스터 완성 “철없던 어린아이가 다시 돌아온 것 같다”",
+          "url": "https://www.ezyeconomy.com/news/articleView.html?idxno=242215",
+          "published": "2026-11-25",
+          "role": "cross",
+          "note": "같은 5명 명단과 김강희 감독 복귀를 확인했어요"
+        }
+      ]
+    },
     {
       "id": "kiss-of-life-greedy-winter",
       "date": "2026-11-25",
