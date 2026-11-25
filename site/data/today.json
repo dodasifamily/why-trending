@@ -1,8 +1,56 @@
 {
   "schema": 1,
   "date": "2026-11-25",
-  "updatedAt": "2026-11-25T15:47:55+09:00",
+  "updatedAt": "2026-11-25T18:18:09+09:00",
   "cards": [
+    {
+      "id": "kiss-of-life-greedy-winter",
+      "date": "2026-11-25",
+      "group": "ent",
+      "cat": "음악",
+      "keyword": "키스오브라이프 Greedy",
+      "line": "25일 오후 6시 데뷔 첫 겨울 시즌송 'Greedy'를 냈어요",
+      "meaning": "걸그룹 키스오브라이프가 25일 오후 6시 음원 사이트에 새 디지털 싱글 'Greedy'(그리디)를 공개했어요. 겨울과 크리스마스를 주제로 한 3곡이 실렸고, 데뷔 뒤 처음 내는 겨울 시즌송이에요.",
+      "why": [
+        "소속사 S2엔터테인먼트는 이번 싱글이 소중한 사람과 보내는 소소한 순간의 따뜻하고 순수한 사랑을 주제로 삼았다고 밝혔어요.",
+        "타이틀곡 'Greedy'는 크리스마스 시즌의 설렘을 서정적인 멜로디에 담은 미디엄 템포 팝이고, 'December Glow'와 'Imperfect Christmas'가 함께 실렸어요.",
+        "텐아시아는 2024년 7월 낸 'Sticky'가 국내 음원 차트에서 인기를 얻어 그룹의 대표곡이 됐고, 올해 8월에는 'SWEAT'을 냈다고 전했어요."
+      ],
+      "sources": [
+        {
+          "name": "뉴시스",
+          "title": "키스오브라이프, 오늘 첫 겨울 시즌송…'그리디'",
+          "url": "https://www.newsis.com/view/NISX20261125_0003881952",
+          "published": "2026-11-25",
+          "role": "report",
+          "note": "25일 오후 6시 발매와 소속사가 밝힌 주제를 확인했어요"
+        },
+        {
+          "name": "텐아시아",
+          "title": "여름 달군 키스오브라이프, 이번엔 겨울이다…첫 시즌송 오늘(25일) 발매",
+          "url": "https://www.tenasia.co.kr/article/2026112585024",
+          "published": "2026-11-25",
+          "role": "cross",
+          "note": "수록곡 3곡과 'Sticky'·'SWEAT' 이야기를 확인했어요"
+        },
+        {
+          "name": "싱글리스트",
+          "title": "키스오브라이프, 첫 겨울 시즌송 'Greedy' 발매",
+          "url": "https://www.slist.kr/news/articleView.html?idxno=784539",
+          "published": "2026-11-25",
+          "role": "cross",
+          "note": "데뷔 첫 겨울 시즌송, 미디엄 템포 팝 곡임을 확인했어요"
+        },
+        {
+          "name": "톱스타뉴스",
+          "title": "키스오브라이프, 첫 겨울송 'Greedy' 발매",
+          "url": "https://www.topstarnews.net/news/articleView.html?idxno=16285463",
+          "published": "2026-11-25",
+          "role": "cross",
+          "note": "같은 발매 시각과 수록곡을 따로 확인했어요"
+        }
+      ]
+    },
     {
       "id": "kosdaq-drop-oct26",
       "date": "2026-11-25",
